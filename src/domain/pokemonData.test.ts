@@ -40,7 +40,13 @@ describe('pokemon Korean display names', () => {
     expect(getSpeciesOption('Charizard')).not.toBeNull();
     expect(getSpeciesOption('Charizard-Mega-X')).not.toBeNull();
     expect(getSpeciesOption('Pikachu')).not.toBeNull();
+    expect(getSpeciesOption('Pidgeot')).not.toBeNull();
+    expect(getSpeciesOption('Gholdengo')).not.toBeNull();
+    expect(getSpeciesOption('Annihilape')).not.toBeNull();
+    expect(getSpeciesOption('Floette-Eternal')).not.toBeNull();
+    expect(getSpeciesOption('Palafin-Hero')).not.toBeNull();
     expect(getSpeciesOption('Caterpie')).toBeNull();
+    expect(getSpeciesOption('Clodsire')).toBeNull();
     expect(getSpeciesOption('Syclant')).toBeNull();
     expect(resolveSpeciesName('캐터피')).toBeNull();
   });

@@ -242,6 +242,59 @@ h2 {
   padding: 0 8px;
 }
 
+.base-stats-panel {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #e4e7eb;
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 10px;
+}
+
+.base-stats-panel__title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  color: #111827;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.base-stats-panel__title small {
+  color: #697586;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.base-stats-table {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+.base-stats-table th,
+.base-stats-table td {
+  padding: 6px 4px;
+  border-bottom: 0;
+  text-align: center;
+  font-size: 12px;
+  white-space: normal;
+}
+
+.base-stats-table th {
+  position: static;
+  background: transparent;
+  color: #52606d;
+  font-weight: 800;
+}
+
+.base-stats-table td {
+  color: #111827;
+  font-weight: 800;
+}
+
 .move-summary {
   flex-wrap: wrap;
   color: #52606d;

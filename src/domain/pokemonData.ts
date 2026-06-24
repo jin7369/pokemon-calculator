@@ -45,9 +45,10 @@ function koreanMoveNameFor(name: string): string {
 const ALL_SPECIES = Array.from(GEN.species).map((species) => species as CalcSpecies);
 const speciesDataByName = new Map(ALL_SPECIES.map((species) => [species.name, species]));
 const championsBaseSpecies = new Set(POKEMON_RULESET.baseSpecies);
-const championsExactSpecies = new Set([
+const championsSelectableSpecies = new Set([
   ...POKEMON_RULESET.baseSpecies,
   ...POKEMON_RULESET.exactSpecies,
+  ...POKEMON_RULESET.derivedSpecies,
 ]);
 
 function baseSpeciesFor(name: string): string {
@@ -67,7 +68,7 @@ function isMegaSpecies(species: CalcSpecies): boolean {
 }
 
 function isRulesetSpecies(species: CalcSpecies): boolean {
-  if (championsExactSpecies.has(species.name)) return true;
+  if (championsSelectableSpecies.has(species.name)) return true;
 
   const baseSpecies = species.baseSpecies ?? species.name;
   return POKEMON_RULESET.includeMegaForms && isMegaSpecies(species) && championsBaseSpecies.has(baseSpecies);

@@ -6,8 +6,10 @@ import {
   CATEGORY_LABELS,
   EMPTY_SPREAD,
   STAT_LABELS,
+  STAT_KEYS,
   type AttackConfig,
   type DefenderBulkConfig,
+  type SpeciesOption,
   type SortKey,
   type StatKey,
   type SurvivalCategory,
@@ -18,6 +20,7 @@ import {
   POKEMON_OPTIONS,
   POKEMON_RULESET,
   getMoveOption,
+  getSpeciesOption,
   resolveMoveName,
   resolveSpeciesName,
 } from './domain/pokemonData';
@@ -285,6 +288,39 @@ function TypeBadge({ type }: { type: string }) {
   return <span className={`type-badge type-${type.toLowerCase()}`}>{type}</span>;
 }
 
+function BaseStatsTable({ species }: { species: SpeciesOption | null }) {
+  if (!species) return null;
+
+  const total = STAT_KEYS.reduce((sum, stat) => sum + species.baseStats[stat], 0);
+
+  return (
+    <div className="base-stats-panel" aria-label={`${species.displayName} 종족값`}>
+      <div className="base-stats-panel__title">
+        <span>{species.displayName}</span>
+        <small>{species.name}</small>
+      </div>
+      <table className="base-stats-table">
+        <thead>
+          <tr>
+            {STAT_KEYS.map((stat) => (
+              <th key={stat}>{STAT_LABELS[stat]}</th>
+            ))}
+            <th>합계</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            {STAT_KEYS.map((stat) => (
+              <td key={stat}>{species.baseStats[stat]}</td>
+            ))}
+            <td>{total}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function EmptyPanel({ title }: { title: string }) {
   return (
     <section className="empty-panel">
@@ -308,6 +344,7 @@ function App() {
   const debouncedTargetSearch = useDebouncedValue(targetSearch, SEARCH_DEBOUNCE_MS);
 
   const selectedAttacker = resolveSpeciesName(attack.attacker);
+  const selectedAttackerOption = selectedAttacker ? getSpeciesOption(selectedAttacker) : null;
   const selectedMoveName = resolveMoveName(attack.move);
   const selectedMove = selectedMoveName ? getMoveOption(selectedMoveName) : null;
   const activeAttackStat = selectedMove ? offensiveStatForCategory(selectedMove.category) : 'spa';
@@ -414,6 +451,8 @@ function App() {
                 options={POKEMON_OPTIONS}
                 onChange={(value) => setAttack((current) => ({ ...current, attacker: value }))}
               />
+
+              <BaseStatsTable species={selectedAttackerOption} />
 
               <SearchSelect
                 label="공격 기술"

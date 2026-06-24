@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from 'react';
-import { Gauge, Search, Shield, SlidersHorizontal, Swords } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Gauge, Search, Shield, SlidersHorizontal, Swords } from 'lucide-react';
 import { useRef } from 'react';
 import './App.css';
 import {
@@ -54,6 +54,7 @@ const LOAD_MORE_RESULTS = 120;
 const INPUT_DEBOUNCE_MS = 180;
 const SEARCH_DEBOUNCE_MS = 120;
 const SEARCH_SELECT_LIMIT = 40;
+const POKEMON_PICKER_PAGE_SIZE = 10;
 
 const INITIAL_ATTACK: AttackConfig = {
   attacker: '리자몽',
@@ -112,6 +113,22 @@ function matchesSearchOption(option: SearchSelectOption, query: string): boolean
     option.displayName.toLowerCase().includes(normalizedQuery) ||
     option.name.toLowerCase().includes(normalizedQuery) ||
     option.id.toLowerCase().includes(normalizedQuery)
+  );
+}
+
+function baseStatTotal(species: SpeciesOption): number {
+  return STAT_KEYS.reduce((sum, stat) => sum + species.baseStats[stat], 0);
+}
+
+function matchesPokemonOption(option: SpeciesOption, query: string): boolean {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (normalizedQuery.length === 0) return true;
+
+  return (
+    option.displayName.toLowerCase().includes(normalizedQuery) ||
+    option.name.toLowerCase().includes(normalizedQuery) ||
+    option.id.toLowerCase().includes(normalizedQuery) ||
+    option.types.some((type) => type.toLowerCase().includes(normalizedQuery))
   );
 }
 
@@ -288,10 +305,154 @@ function TypeBadge({ type }: { type: string }) {
   return <span className={`type-badge type-${type.toLowerCase()}`}>{type}</span>;
 }
 
+function PokemonPicker({
+  label,
+  value,
+  selected,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  selected: SpeciesOption | null;
+  options: SpeciesOption[];
+  onChange: (value: string) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [page, setPage] = useState(0);
+  const panelId = `${label.replace(/\s+/g, '-')}-pokemon-picker`;
+  const filteredOptions = useMemo(
+    () => options.filter((option) => matchesPokemonOption(option, query)),
+    [options, query],
+  );
+  const pageCount = Math.max(1, Math.ceil(filteredOptions.length / POKEMON_PICKER_PAGE_SIZE));
+  const safePage = Math.min(page, pageCount - 1);
+  const pageStart = safePage * POKEMON_PICKER_PAGE_SIZE;
+  const visibleOptions = filteredOptions.slice(pageStart, pageStart + POKEMON_PICKER_PAGE_SIZE);
+
+  useEffect(() => {
+    setPage(0);
+  }, [query]);
+
+  function selectPokemon(option: SpeciesOption) {
+    onChange(option.displayName);
+    setIsOpen(false);
+    setQuery('');
+    setPage(0);
+  }
+
+  return (
+    <section className="pokemon-picker" aria-label={label}>
+      <div className="field-label">
+        <span>{label}</span>
+        <button
+          type="button"
+          className="pokemon-picker__selected"
+          aria-expanded={isOpen}
+          aria-controls={panelId}
+          onClick={() => setIsOpen((current) => !current)}
+        >
+          <span className="pokemon-picker__selected-name">
+            <strong>{selected?.displayName ?? value}</strong>
+            <small>{selected?.name ?? '검색해서 선택'}</small>
+          </span>
+          {selected ? (
+            <span className="type-list">
+              {selected.types.map((type) => <TypeBadge key={type} type={type} />)}
+            </span>
+          ) : null}
+          {selected ? <span className="pokemon-picker__selected-total">합계 {baseStatTotal(selected)}</span> : null}
+        </button>
+      </div>
+
+      {isOpen ? (
+        <div className="pokemon-picker__panel" id={panelId}>
+          <label className="pokemon-picker__search">
+            <Search size={17} aria-hidden="true" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="포켓몬 이름, 영문명, 타입 검색"
+              autoFocus
+            />
+          </label>
+
+          <div className="pokemon-picker__meta">
+            <span>{filteredOptions.length.toLocaleString()}개 결과</span>
+            <span>{filteredOptions.length > 0 ? `${pageStart + 1}-${pageStart + visibleOptions.length}` : '0'} 표시</span>
+          </div>
+
+          <div className="pokemon-picker__list" role="listbox" aria-label="포켓몬 목록">
+            {visibleOptions.length > 0 ? (
+              visibleOptions.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  role="option"
+                  aria-selected={option.name === selected?.name}
+                  className={option.name === selected?.name ? 'pokemon-picker__option pokemon-picker__option--selected' : 'pokemon-picker__option'}
+                  onClick={() => selectPokemon(option)}
+                >
+                  <span className="pokemon-picker__option-main">
+                    <span>
+                      <strong>{option.displayName}</strong>
+                      <small>{option.name}</small>
+                    </span>
+                    <span className="type-list">
+                      {option.types.map((type) => <TypeBadge key={type} type={type} />)}
+                    </span>
+                  </span>
+                  <span className="pokemon-picker__option-stats">
+                    {STAT_KEYS.map((stat) => (
+                      <span key={stat}>
+                        <small>{STAT_LABELS[stat]}</small>
+                        <strong>{option.baseStats[stat]}</strong>
+                      </span>
+                    ))}
+                    <span>
+                      <small>합계</small>
+                      <strong>{baseStatTotal(option)}</strong>
+                    </span>
+                  </span>
+                </button>
+              ))
+            ) : (
+              <div className="pokemon-picker__empty">검색 결과 없음</div>
+            )}
+          </div>
+
+          <div className="pokemon-picker__pagination">
+            <button
+              type="button"
+              aria-label="이전 페이지"
+              disabled={safePage === 0}
+              onClick={() => setPage((current) => Math.max(current - 1, 0))}
+            >
+              <ChevronLeft size={17} aria-hidden="true" />
+              이전
+            </button>
+            <span>{safePage + 1}/{pageCount}</span>
+            <button
+              type="button"
+              aria-label="다음 페이지"
+              disabled={safePage >= pageCount - 1}
+              onClick={() => setPage((current) => Math.min(current + 1, pageCount - 1))}
+            >
+              다음
+              <ChevronRight size={17} aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 function BaseStatsTable({ species }: { species: SpeciesOption | null }) {
   if (!species) return null;
 
-  const total = STAT_KEYS.reduce((sum, stat) => sum + species.baseStats[stat], 0);
+  const total = baseStatTotal(species);
 
   return (
     <div className="base-stats-panel" aria-label={`${species.displayName} 종족값`}>
@@ -445,9 +606,10 @@ function App() {
                 <h2>공격 설정</h2>
               </div>
 
-              <SearchSelect
+              <PokemonPicker
                 label="공격 포켓몬"
                 value={attack.attacker}
+                selected={selectedAttackerOption}
                 options={POKEMON_OPTIONS}
                 onChange={(value) => setAttack((current) => ({ ...current, attacker: value }))}
               />

@@ -1,0 +1,89 @@
+﻿import type { StatID } from '@smogon/calc';
+
+export type StatKey = StatID;
+export type CombatStatKey = Exclude<StatKey, 'hp'>;
+export type MoveCategory = 'Physical' | 'Special';
+export type SortKey = 'maxPercentDesc' | 'maxPercentAsc' | 'nameAsc' | 'hpDesc';
+export type SurvivalCategory = 'survives' | 'roll' | 'ko';
+
+export type StatPointSpread = Record<StatKey, number>;
+
+export interface SpeciesOption {
+  id: string;
+  name: string;
+  displayName: string;
+  types: string[];
+  baseStats: Record<StatKey, number>;
+}
+
+export interface MoveOption {
+  id: string;
+  name: string;
+  displayName: string;
+  type: string;
+  category: MoveCategory;
+  basePower: number;
+}
+
+export interface AttackConfig {
+  attacker: string;
+  move: string;
+  nature: string;
+  attackStatPoints: Pick<StatPointSpread, 'atk' | 'spa'>;
+  boostStage: number;
+  directMultiplier: number;
+}
+
+export interface DefenderBulkConfig {
+  nature: string;
+  statPoints: Pick<StatPointSpread, 'hp' | 'def' | 'spd'>;
+}
+
+export interface DamageResult {
+  id: string;
+  name: string;
+  displayName: string;
+  types: string[];
+  hp: number;
+  minDamage: number;
+  maxDamage: number;
+  minPercent: number;
+  maxPercent: number;
+  category: SurvivalCategory;
+}
+
+export interface DamageSummary {
+  survives: number;
+  roll: number;
+  ko: number;
+  total: number;
+}
+
+export const STAT_KEYS: StatKey[] = ['hp', 'atk', 'def', 'spa', 'spd', 'spe'];
+
+export const STAT_LABELS: Record<StatKey, string> = {
+  hp: 'HP',
+  atk: '공격',
+  def: '방어',
+  spa: '특공',
+  spd: '특방',
+  spe: '스피드',
+};
+
+export const CATEGORY_LABELS: Record<SurvivalCategory, string> = {
+  survives: '확정 생존',
+  roll: '난수',
+  ko: '확정 KO',
+};
+
+export const EMPTY_SPREAD: StatPointSpread = {
+  hp: 0,
+  atk: 0,
+  def: 0,
+  spa: 0,
+  spd: 0,
+  spe: 0,
+};
+
+
+

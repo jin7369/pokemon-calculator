@@ -12,6 +12,7 @@ import type {
   SurvivalCategory,
 } from './types';
 import { BATTLE_LEVEL, GEN, getMoveOption, POKEMON_OPTIONS } from './pokemonData';
+import { combinedAttackMultiplier } from './offenseItems';
 import { statPointsToEvs } from './statPoints';
 
 const EMPTY_BOOSTS: StatsTable = {
@@ -93,6 +94,7 @@ export function calculateAttackResults(
   if (!moveOption) return { results: [], summary: summarizeResults([]) };
 
   const offensiveStat = offensiveStatForCategory(moveOption.category);
+  const finalMultiplier = combinedAttackMultiplier(attack.item, moveOption, attack.directMultiplier);
   const attackerEvs = statPointsToEvs({
     [offensiveStat]: attack.attackStatPoints[offensiveStat],
   });
@@ -115,7 +117,7 @@ export function calculateAttackResults(
         evs: defenderEvs,
       });
       const rawRange = calculate(GEN, attacker, defender, move).range();
-      const [minDamage, maxDamage] = applyDirectMultiplier(rawRange, attack.directMultiplier);
+      const [minDamage, maxDamage] = applyDirectMultiplier(rawRange, finalMultiplier);
       const hp = defender.maxHP();
       const minPercent = hp > 0 ? (minDamage / hp) * 100 : 0;
       const maxPercent = hp > 0 ? (maxDamage / hp) * 100 : 0;

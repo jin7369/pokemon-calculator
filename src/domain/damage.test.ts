@@ -25,6 +25,7 @@ describe('damage helpers', () => {
     const attack: AttackConfig = {
       attacker: 'Charizard',
       move: 'Flamethrower',
+      item: 'none',
       nature: 'Modest',
       attackStatPoints: { atk: 0, spa: 31 },
       boostStage: 0,
@@ -43,6 +44,7 @@ describe('damage helpers', () => {
     const attack: AttackConfig = {
       attacker: 'Pikachu',
       move: 'Thunderbolt',
+      item: 'none',
       nature: 'Modest',
       attackStatPoints: { atk: 0, spa: 31 },
       boostStage: 0,

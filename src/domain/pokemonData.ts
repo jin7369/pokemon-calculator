@@ -3,6 +3,7 @@ import { MOVE_KOREAN_NAMES } from '../data/moveKoreanNames';
 import { MOVE_NAME_OVERRIDES } from '../data/moveNameOverrides';
 import { POKEMON_KOREAN_NAMES } from '../data/pokemonKoreanNames';
 import { CHAMPIONS_CURRENT_RULESET } from '../data/championsRulesets';
+import { LEARNABLE_ATTACK_MOVE_IDS_BY_SPECIES } from '../data/learnableAttackMoves';
 import type { StatKey, SpeciesOption, MoveOption, MoveCategory } from './types';
 import { STAT_LABELS } from './types';
 
@@ -176,6 +177,7 @@ for (const move of MOVE_OPTIONS) {
 }
 
 const moveByName = new Map(MOVE_OPTIONS.map((move) => [move.name, move]));
+const moveById = new Map(MOVE_OPTIONS.map((move) => [move.id, move]));
 const speciesByName = new Map(POKEMON_OPTIONS.map((species) => [species.name, species]));
 
 export function resolveSpeciesName(input: string): string | null {
@@ -192,5 +194,15 @@ export function getMoveOption(name: string): MoveOption | null {
 
 export function getSpeciesOption(name: string): SpeciesOption | null {
   return speciesByName.get(name) ?? null;
+}
+
+export function getLearnableAttackMoveOptionsForSpecies(name: string | null): MoveOption[] {
+  if (!name) return [];
+
+  const moveIds = LEARNABLE_ATTACK_MOVE_IDS_BY_SPECIES[name as keyof typeof LEARNABLE_ATTACK_MOVE_IDS_BY_SPECIES] ?? [];
+  return moveIds
+    .map((moveId) => moveById.get(moveId))
+    .filter((move): move is MoveOption => Boolean(move))
+    .sort(compareByDisplayName);
 }
 

@@ -28,6 +28,7 @@ export interface MoveOption {
 export interface AttackConfig {
   attacker: string;
   move: string;
+  item: string;
   nature: string;
   attackStatPoints: Pick<StatPointSpread, 'atk' | 'spa'>;
   boostStage: number;

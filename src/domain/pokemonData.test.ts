@@ -3,6 +3,7 @@ import {
   displayNameForMove,
   displayNameForSpecies,
   getMoveOption,
+  getLearnableAttackMoveOptionsForSpecies,
   getSpeciesOption,
   MOVE_OPTIONS,
   POKEMON_OPTIONS,
@@ -53,6 +54,12 @@ describe('pokemon Korean display names', () => {
 
   it('keeps species option display names unique', () => {
     expect(new Set(POKEMON_OPTIONS.map((species) => species.displayName)).size).toBe(POKEMON_OPTIONS.length);
+  });
+
+  it('returns learnable attacking moves for a selected species', () => {
+    expect(getLearnableAttackMoveOptionsForSpecies('Charizard').some((move) => move.name === 'Flamethrower')).toBe(true);
+    expect(getLearnableAttackMoveOptionsForSpecies('Gholdengo').some((move) => move.name === 'Thunderbolt')).toBe(true);
+    expect(getLearnableAttackMoveOptionsForSpecies('Caterpie')).toEqual([]);
   });
 });
 

@@ -1,6 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Gauge, Search, Shield, SlidersHorizontal, Swords } from 'lucide-react';
-import { useRef } from 'react';
 import './App.css';
 import {
   CATEGORY_LABELS,
@@ -9,16 +8,17 @@ import {
   STAT_KEYS,
   type AttackConfig,
   type DefenderBulkConfig,
+  type MoveOption,
   type SpeciesOption,
   type SortKey,
   type StatKey,
   type SurvivalCategory,
 } from './domain/types';
 import {
-  MOVE_OPTIONS,
   NATURE_OPTIONS,
   POKEMON_OPTIONS,
   POKEMON_RULESET,
+  getLearnableAttackMoveOptionsForSpecies,
   getMoveOption,
   getSpeciesOption,
   resolveMoveName,
@@ -35,16 +35,18 @@ import {
   totalStatPoints,
   updateStatPoint,
 } from './domain/statPoints';
+import {
+  NO_OFFENSE_ITEM_ID,
+  OFFENSE_ITEM_OPTIONS,
+  combinedAttackMultiplier,
+  formatMultiplier,
+  getOffenseItemOption,
+  offenseItemMultiplierForMove,
+} from './domain/offenseItems';
 
 type TabKey = 'attack' | 'defense' | 'speed';
 
 type FilterState = Record<SurvivalCategory, boolean>;
-
-interface SearchSelectOption {
-  id: string;
-  name: string;
-  displayName: string;
-}
 
 const DIRECT_MULTIPLIERS = [0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4];
 const BOOST_STAGES = [-6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6];
@@ -53,12 +55,13 @@ const INITIAL_VISIBLE_RESULTS = 120;
 const LOAD_MORE_RESULTS = 120;
 const INPUT_DEBOUNCE_MS = 180;
 const SEARCH_DEBOUNCE_MS = 120;
-const SEARCH_SELECT_LIMIT = 40;
 const POKEMON_PICKER_PAGE_SIZE = 10;
+const MOVE_PICKER_PAGE_SIZE = 10;
 
 const INITIAL_ATTACK: AttackConfig = {
   attacker: '리자몽',
   move: '화염방사',
+  item: NO_OFFENSE_ITEM_ID,
   nature: 'Modest',
   attackStatPoints: { atk: 0, spa: 31 },
   boostStage: 0,
@@ -105,17 +108,6 @@ function toFullSpread(partial: Partial<Record<StatKey, number>>) {
   return { ...EMPTY_SPREAD, ...partial };
 }
 
-function matchesSearchOption(option: SearchSelectOption, query: string): boolean {
-  const normalizedQuery = query.trim().toLowerCase();
-  if (normalizedQuery.length === 0) return true;
-
-  return (
-    option.displayName.toLowerCase().includes(normalizedQuery) ||
-    option.name.toLowerCase().includes(normalizedQuery) ||
-    option.id.toLowerCase().includes(normalizedQuery)
-  );
-}
-
 function baseStatTotal(species: SpeciesOption): number {
   return STAT_KEYS.reduce((sum, stat) => sum + species.baseStats[stat], 0);
 }
@@ -132,138 +124,16 @@ function matchesPokemonOption(option: SpeciesOption, query: string): boolean {
   );
 }
 
-function SearchSelect({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  options: SearchSelectOption[];
-  onChange: (value: string) => void;
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [activeIndex, setActiveIndex] = useState(0);
-  const [showAllOptions, setShowAllOptions] = useState(false);
-  const isInteractingWithList = useRef(false);
-  const listboxId = `${label.replace(/\s+/g, '-')}-options`;
-  const visibleOptions = useMemo(() => {
-    const query = showAllOptions ? '' : value;
-    const matches = options.filter((option) => matchesSearchOption(option, query));
-    const currentOption = options.find((option) => option.displayName === value || option.name === value || option.id === value);
-
-    if (showAllOptions && currentOption) {
-      return [currentOption, ...matches.filter((option) => option.id !== currentOption.id)].slice(0, SEARCH_SELECT_LIMIT);
-    }
-
-    return matches.slice(0, SEARCH_SELECT_LIMIT);
-  }, [options, showAllOptions, value]);
-
-  useEffect(() => {
-    setActiveIndex(0);
-  }, [showAllOptions, value]);
-
-  function selectOption(option: SearchSelectOption) {
-    onChange(option.displayName);
-    setIsOpen(false);
-    setActiveIndex(0);
-    setShowAllOptions(false);
-    isInteractingWithList.current = false;
-  }
-
-  function releaseListInteraction() {
-    window.setTimeout(() => {
-      isInteractingWithList.current = false;
-    }, 0);
-  }
+function matchesMoveOption(option: MoveOption, query: string): boolean {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (normalizedQuery.length === 0) return true;
 
   return (
-    <label className="field-label combo-field">
-      <span>{label}</span>
-      <div className="combo-field__control">
-        <input
-          value={value}
-          role="combobox"
-          aria-autocomplete="list"
-          aria-controls={listboxId}
-          aria-expanded={isOpen}
-          onFocus={(event) => {
-            event.currentTarget.select();
-            setShowAllOptions(true);
-            setIsOpen(true);
-          }}
-          onBlur={() => {
-            window.setTimeout(() => {
-              if (!isInteractingWithList.current) {
-                setIsOpen(false);
-              }
-            }, 0);
-          }}
-          onChange={(event) => {
-            setShowAllOptions(false);
-            onChange(event.target.value);
-            setIsOpen(true);
-          }}
-          onKeyDown={(event) => {
-            if (event.key === 'ArrowDown') {
-              event.preventDefault();
-              setIsOpen(true);
-              setActiveIndex((current) => Math.min(current + 1, Math.max(visibleOptions.length - 1, 0)));
-              return;
-            }
-
-            if (event.key === 'ArrowUp') {
-              event.preventDefault();
-              setActiveIndex((current) => Math.max(current - 1, 0));
-              return;
-            }
-
-            if (event.key === 'Enter' && isOpen && visibleOptions[activeIndex]) {
-              event.preventDefault();
-              selectOption(visibleOptions[activeIndex]);
-              return;
-            }
-
-            if (event.key === 'Escape') {
-              setIsOpen(false);
-            }
-          }}
-        />
-        {isOpen ? (
-          <div
-            className="combo-field__list"
-            id={listboxId}
-            role="listbox"
-            onPointerDownCapture={() => {
-              isInteractingWithList.current = true;
-            }}
-            onPointerUpCapture={releaseListInteraction}
-            onPointerCancelCapture={releaseListInteraction}
-          >
-            {visibleOptions.length > 0 ? (
-              visibleOptions.map((option, index) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  role="option"
-                  aria-selected={index === activeIndex}
-                  className={index === activeIndex ? 'combo-field__option combo-field__option--active' : 'combo-field__option'}
-                  onMouseEnter={() => setActiveIndex(index)}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => selectOption(option)}
-                >
-                  <span>{option.displayName}</span>
-                  <small>{option.name}</small>
-                </button>
-              ))
-            ) : (
-              <div className="combo-field__empty">검색 결과 없음</div>
-            )}
-          </div>
-        ) : null}
-      </div>
-    </label>
+    option.displayName.toLowerCase().includes(normalizedQuery) ||
+    option.name.toLowerCase().includes(normalizedQuery) ||
+    option.id.toLowerCase().includes(normalizedQuery) ||
+    option.type.toLowerCase().includes(normalizedQuery) ||
+    option.category.toLowerCase().includes(normalizedQuery)
   );
 }
 
@@ -449,6 +319,142 @@ function PokemonPicker({
   );
 }
 
+function MovePicker({
+  label,
+  value,
+  selected,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  selected: MoveOption | null;
+  options: MoveOption[];
+  onChange: (value: string) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [page, setPage] = useState(0);
+  const panelId = `${label.replace(/\s+/g, '-')}-move-picker`;
+  const filteredOptions = useMemo(
+    () => options.filter((option) => matchesMoveOption(option, query)),
+    [options, query],
+  );
+  const pageCount = Math.max(1, Math.ceil(filteredOptions.length / MOVE_PICKER_PAGE_SIZE));
+  const safePage = Math.min(page, pageCount - 1);
+  const pageStart = safePage * MOVE_PICKER_PAGE_SIZE;
+  const visibleOptions = filteredOptions.slice(pageStart, pageStart + MOVE_PICKER_PAGE_SIZE);
+
+  useEffect(() => {
+    setPage(0);
+  }, [query, options]);
+
+  function selectMove(option: MoveOption) {
+    onChange(option.displayName);
+    setIsOpen(false);
+    setQuery('');
+    setPage(0);
+  }
+
+  return (
+    <section className="pokemon-picker move-picker" aria-label={label}>
+      <div className="field-label">
+        <span>{label}</span>
+        <button
+          type="button"
+          className="pokemon-picker__selected"
+          aria-expanded={isOpen}
+          aria-controls={panelId}
+          onClick={() => setIsOpen((current) => !current)}
+        >
+          <span className="pokemon-picker__selected-name">
+            <strong>{selected?.displayName ?? value}</strong>
+            <small>{selected?.name ?? '포켓몬을 먼저 선택'}</small>
+          </span>
+          {selected ? <TypeBadge type={selected.type} /> : null}
+          {selected ? <span className="pokemon-picker__selected-total">{selected.category} · 위력 {selected.basePower}</span> : null}
+        </button>
+      </div>
+
+      {isOpen ? (
+        <div className="pokemon-picker__panel" id={panelId}>
+          <label className="pokemon-picker__search">
+            <Search size={17} aria-hidden="true" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="기술 이름, 영문명, 타입 검색"
+              autoFocus
+            />
+          </label>
+
+          <div className="pokemon-picker__meta">
+            <span>{filteredOptions.length.toLocaleString()}개 결과</span>
+            <span>{filteredOptions.length > 0 ? `${pageStart + 1}-${pageStart + visibleOptions.length}` : '0'} 표시</span>
+          </div>
+
+          <div className="pokemon-picker__list" role="listbox" aria-label="기술 목록">
+            {visibleOptions.length > 0 ? (
+              visibleOptions.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  role="option"
+                  aria-selected={option.name === selected?.name}
+                  className={option.name === selected?.name ? 'pokemon-picker__option move-picker__option pokemon-picker__option--selected' : 'pokemon-picker__option move-picker__option'}
+                  onClick={() => selectMove(option)}
+                >
+                  <span className="pokemon-picker__option-main">
+                    <span>
+                      <strong>{option.displayName}</strong>
+                      <small>{option.name}</small>
+                    </span>
+                    <TypeBadge type={option.type} />
+                  </span>
+                  <span className="move-picker__option-details">
+                    <span>
+                      <small>분류</small>
+                      <strong>{option.category}</strong>
+                    </span>
+                    <span>
+                      <small>위력</small>
+                      <strong>{option.basePower}</strong>
+                    </span>
+                  </span>
+                </button>
+              ))
+            ) : (
+              <div className="pokemon-picker__empty">공격 기술 없음</div>
+            )}
+          </div>
+
+          <div className="pokemon-picker__pagination">
+            <button
+              type="button"
+              aria-label="이전 페이지"
+              disabled={safePage === 0}
+              onClick={() => setPage((current) => Math.max(current - 1, 0))}
+            >
+              <ChevronLeft size={17} aria-hidden="true" />
+              이전
+            </button>
+            <span>{safePage + 1}/{pageCount}</span>
+            <button
+              type="button"
+              aria-label="다음 페이지"
+              disabled={safePage >= pageCount - 1}
+              onClick={() => setPage((current) => Math.min(current + 1, pageCount - 1))}
+            >
+              다음
+              <ChevronRight size={17} aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 function BaseStatsTable({ species }: { species: SpeciesOption | null }) {
   if (!species) return null;
 
@@ -506,15 +512,41 @@ function App() {
 
   const selectedAttacker = resolveSpeciesName(attack.attacker);
   const selectedAttackerOption = selectedAttacker ? getSpeciesOption(selectedAttacker) : null;
+  const selectedAttackerMoveOptions = useMemo(
+    () => getLearnableAttackMoveOptionsForSpecies(selectedAttacker),
+    [selectedAttacker],
+  );
   const selectedMoveName = resolveMoveName(attack.move);
   const selectedMove = selectedMoveName ? getMoveOption(selectedMoveName) : null;
-  const activeAttackStat = selectedMove ? offensiveStatForCategory(selectedMove.category) : 'spa';
+  const selectedMoveIsLearnable = selectedAttackerMoveOptions.some((move) => move.name === selectedMoveName);
+  const selectedLearnableMove = selectedMoveIsLearnable ? selectedMove : null;
+  const selectedItem = getOffenseItemOption(attack.item);
+  const itemMultiplier = offenseItemMultiplierForMove(attack.item, selectedLearnableMove);
+  const finalAttackMultiplier = combinedAttackMultiplier(attack.item, selectedLearnableMove, attack.directMultiplier);
+  const activeAttackStat = selectedLearnableMove ? offensiveStatForCategory(selectedLearnableMove.category) : 'spa';
+
+  useEffect(() => {
+    if (!selectedAttacker || selectedAttackerMoveOptions.length === 0) return;
+
+    const currentMove = resolveMoveName(attack.move);
+    const currentMoveIsLearnable = selectedAttackerMoveOptions.some((move) => move.name === currentMove);
+    if (currentMoveIsLearnable) return;
+
+    setAttack((current) => ({
+      ...current,
+      move: selectedAttackerMoveOptions[0].displayName,
+    }));
+  }, [attack.move, selectedAttacker, selectedAttackerMoveOptions]);
 
   const calculationAttack = useMemo<AttackConfig | null>(() => {
     const calculationAttacker = resolveSpeciesName(debouncedAttack.attacker);
     const calculationMove = resolveMoveName(debouncedAttack.move);
 
-    if (!calculationAttacker || !calculationMove) return null;
+    if (
+      !calculationAttacker ||
+      !calculationMove ||
+      !getLearnableAttackMoveOptionsForSpecies(calculationAttacker).some((move) => move.name === calculationMove)
+    ) return null;
 
     return {
       ...debouncedAttack,
@@ -616,20 +648,40 @@ function App() {
 
               <BaseStatsTable species={selectedAttackerOption} />
 
-              <SearchSelect
+              <MovePicker
                 label="공격 기술"
                 value={attack.move}
-                options={MOVE_OPTIONS}
+                selected={selectedLearnableMove}
+                options={selectedAttackerMoveOptions}
                 onChange={(value) => setAttack((current) => ({ ...current, move: value }))}
               />
 
-              {selectedMove ? (
+              {selectedLearnableMove ? (
                 <div className="move-summary">
-                  <TypeBadge type={selectedMove.type} />
-                  <span>{selectedMove.category}</span>
-                  <span>위력 {selectedMove.basePower}</span>
+                  <TypeBadge type={selectedLearnableMove.type} />
+                  <span>{selectedLearnableMove.category}</span>
+                  <span>위력 {selectedLearnableMove.basePower}</span>
                 </div>
               ) : null}
+
+              <label className="field-label">
+                <span>화력 아이템</span>
+                <select
+                  value={attack.item}
+                  onChange={(event) => setAttack((current) => ({ ...current, item: event.target.value }))}
+                >
+                  {OFFENSE_ITEM_OPTIONS.map((item) => (
+                    <option key={item.id} value={item.id}>{item.label}</option>
+                  ))}
+                </select>
+              </label>
+
+              <div className="multiplier-summary">
+                <span>아이템 {formatMultiplier(itemMultiplier)}</span>
+                <span>직접 {formatMultiplier(attack.directMultiplier)}</span>
+                <strong>최종 {formatMultiplier(finalAttackMultiplier)}</strong>
+                <small>{selectedItem.label}</small>
+              </div>
 
               <label className="field-label">
                 <span>성격</span>
@@ -743,7 +795,7 @@ function App() {
               <div className="result-count">{visibleResults.length}/{filteredResults.length} 표시</div>
             </div>
 
-            {!selectedAttacker || !selectedMoveName ? (
+            {!selectedAttacker || !selectedLearnableMove ? (
               <div className="invalid-state">포켓몬 또는 기술 이름을 확인하세요.</div>
             ) : (
               <>

@@ -437,6 +437,39 @@ h2 {
   line-height: 1.1;
 }
 
+.move-picker__option {
+  min-height: 66px;
+}
+
+.move-picker__option-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.move-picker__option-details span {
+  display: grid;
+  gap: 2px;
+  border-radius: 6px;
+  background: #f8fafc;
+  padding: 5px 6px;
+  text-align: center;
+}
+
+.move-picker__option-details small {
+  color: #697586;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.move-picker__option-details strong {
+  color: #111827;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
 .pokemon-picker__empty {
   min-height: 72px;
   display: grid;
@@ -527,6 +560,41 @@ h2 {
   color: #52606d;
   font-size: 13px;
   font-weight: 700;
+}
+
+.multiplier-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  border: 1px solid #e4e7eb;
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 10px;
+}
+
+.multiplier-summary span,
+.multiplier-summary strong,
+.multiplier-summary small {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #354352;
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.multiplier-summary strong {
+  background: #17212f;
+  color: #ffffff;
+}
+
+.multiplier-summary small {
+  grid-column: 1 / -1;
+  color: #697586;
 }
 
 .stat-block {

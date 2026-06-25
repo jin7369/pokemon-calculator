@@ -57,12 +57,11 @@ type FilterState = Record<SurvivalCategory, boolean>;
 const DIRECT_MULTIPLIERS = [0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4];
 const BOOST_STAGES = [-6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6];
 const CATEGORY_ORDER: SurvivalCategory[] = ['survives', 'roll', 'ko'];
-const INITIAL_VISIBLE_RESULTS = 120;
-const LOAD_MORE_RESULTS = 120;
 const INPUT_DEBOUNCE_MS = 180;
 const SEARCH_DEBOUNCE_MS = 120;
 const POKEMON_PICKER_PAGE_SIZE = 10;
 const MOVE_PICKER_PAGE_SIZE = 10;
+const TARGET_RESULTS_PAGE_SIZE = 10;
 const EMPTY_ABILITY_OPTIONS: string[] = [];
 
 const INITIAL_ATTACK: AttackConfig = {
@@ -533,7 +532,7 @@ function App() {
   const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS);
   const [targetSearch, setTargetSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('maxPercentDesc');
-  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_RESULTS);
+  const [targetPage, setTargetPage] = useState(0);
 
   const debouncedAttack = useDebouncedValue(attack, INPUT_DEBOUNCE_MS);
   const debouncedDefenderBulk = useDebouncedValue(defenderBulk, INPUT_DEBOUNCE_MS);
@@ -622,13 +621,18 @@ function App() {
   }, [calculation.results, filters, sortKey, debouncedTargetSearch]);
 
   useEffect(() => {
-    setVisibleCount(INITIAL_VISIBLE_RESULTS);
+    setTargetPage(0);
   }, [calculation.results, filters, sortKey, debouncedTargetSearch]);
 
+  const targetPageCount = Math.max(1, Math.ceil(filteredResults.length / TARGET_RESULTS_PAGE_SIZE));
+  const safeTargetPage = Math.min(targetPage, targetPageCount - 1);
+  const targetPageStart = safeTargetPage * TARGET_RESULTS_PAGE_SIZE;
   const visibleResults = useMemo(
-    () => filteredResults.slice(0, visibleCount),
-    [filteredResults, visibleCount],
+    () => filteredResults.slice(targetPageStart, targetPageStart + TARGET_RESULTS_PAGE_SIZE),
+    [filteredResults, targetPageStart],
   );
+  const targetDisplayStart = filteredResults.length > 0 ? targetPageStart + 1 : 0;
+  const targetDisplayEnd = targetPageStart + visibleResults.length;
 
   const attackPointSpread = toFullSpread(attack.attackStatPoints);
   const defensePointSpread = toFullSpread(defenderBulk.statPoints);
@@ -913,7 +917,9 @@ function App() {
                 <p className="eyebrow">Damage Results</p>
                 <h2>전체 대상 계산</h2>
               </div>
-              <div className="result-count">{visibleResults.length}/{filteredResults.length} 표시</div>
+              <div className="result-count">
+                {targetDisplayStart}-{targetDisplayEnd}/{filteredResults.length} 표시
+              </div>
             </div>
 
             {!selectedAttacker || !selectedLearnableMove ? (
@@ -954,6 +960,11 @@ function App() {
                   </label>
                 </div>
 
+                <div className="results-page-meta">
+                  <span>{filteredResults.length.toLocaleString()}개 결과</span>
+                  <span>{targetDisplayStart}-{targetDisplayEnd} 표시</span>
+                </div>
+
                 <div className="table-wrap">
                   <table>
                     <thead>
@@ -967,37 +978,58 @@ function App() {
                       </tr>
                     </thead>
                     <tbody>
-                      {visibleResults.map((result) => (
-                        <tr key={result.id}>
-                          <td className="pokemon-cell"><span>{result.displayName ?? result.name}</span><small>{result.name}</small></td>
-                          <td>
-                            <div className="type-list">
-                              {result.types.map((type) => <TypeBadge key={type} type={type} />)}
-                            </div>
-                          </td>
-                          <td>{result.hp}</td>
-                          <td>{result.minDamage}-{result.maxDamage}</td>
-                          <td>{formatPercent(result.minPercent)} - {formatPercent(result.maxPercent)}</td>
-                          <td>
-                            <span className={`verdict verdict--${result.category}`}>
-                              {CATEGORY_LABELS[result.category]}
-                            </span>
-                          </td>
+                      {visibleResults.length > 0 ? (
+                        visibleResults.map((result) => (
+                          <tr key={result.id}>
+                            <td className="pokemon-cell"><span>{result.displayName ?? result.name}</span><small>{result.name}</small></td>
+                            <td>
+                              <div className="type-list">
+                                {result.types.map((type) => <TypeBadge key={type} type={type} />)}
+                              </div>
+                            </td>
+                            <td>{result.hp}</td>
+                            <td>{result.minDamage}-{result.maxDamage}</td>
+                            <td>{formatPercent(result.minPercent)} - {formatPercent(result.maxPercent)}</td>
+                            <td>
+                              <span className={`verdict verdict--${result.category}`}>
+                                {CATEGORY_LABELS[result.category]}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td className="results-empty-row" colSpan={6}>검색 결과 없음</td>
                         </tr>
-                      ))}
+                      )}
                     </tbody>
                   </table>
                 </div>
 
-                {visibleResults.length < filteredResults.length ? (
-                  <button
-                    type="button"
-                    className="load-more-button"
-                    onClick={() => setVisibleCount((current) => Math.min(current + LOAD_MORE_RESULTS, filteredResults.length))}
-                  >
-                    더 보기 ({(filteredResults.length - visibleResults.length).toLocaleString()}개 남음)
-                  </button>
+                {filteredResults.length > 0 ? (
+                  <div className="results-pagination">
+                    <button
+                      type="button"
+                      aria-label="이전 결과 페이지"
+                      disabled={safeTargetPage === 0}
+                      onClick={() => setTargetPage((current) => Math.max(current - 1, 0))}
+                    >
+                      <ChevronLeft size={17} aria-hidden="true" />
+                      이전
+                    </button>
+                    <span>{safeTargetPage + 1}/{targetPageCount}</span>
+                    <button
+                      type="button"
+                      aria-label="다음 결과 페이지"
+                      disabled={safeTargetPage >= targetPageCount - 1}
+                      onClick={() => setTargetPage((current) => Math.min(current + 1, targetPageCount - 1))}
+                    >
+                      다음
+                      <ChevronRight size={17} aria-hidden="true" />
+                    </button>
+                  </div>
                 ) : null}
+
               </>
             )}
           </section>

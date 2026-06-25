@@ -5,6 +5,7 @@ export type CombatStatKey = Exclude<StatKey, 'hp'>;
 export type MoveCategory = 'Physical' | 'Special';
 export type SortKey = 'maxPercentDesc' | 'maxPercentAsc' | 'nameAsc' | 'hpDesc';
 export type SurvivalCategory = 'survives' | 'roll' | 'ko';
+export type HitCountSetting = 'auto' | number;
 
 export type StatPointSpread = Record<StatKey, number>;
 
@@ -24,6 +25,17 @@ export interface MoveOption {
   type: string;
   category: MoveCategory;
   basePower: number;
+  multiHit?: MoveMultiHitOption;
+}
+
+export interface MoveMultiHitOption {
+  min: number;
+  max: number;
+  defaultHits: number;
+  selectableHits: number[];
+  supportsSkillLink: boolean;
+  supportsLoadedDice: boolean;
+  multiAccuracy: boolean;
 }
 
 export interface AttackConfig {
@@ -32,6 +44,7 @@ export interface AttackConfig {
   item: string;
   ability: string;
   abilityEnabled: boolean;
+  hitCount: HitCountSetting;
   nature: string;
   attackStatPoints: Pick<StatPointSpread, 'atk' | 'spa'>;
   boostStage: number;

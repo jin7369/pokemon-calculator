@@ -5,7 +5,7 @@ import { POKEMON_KOREAN_NAMES } from '../data/pokemonKoreanNames';
 import { CHAMPIONS_CURRENT_RULESET } from '../data/championsRulesets';
 import { LEARNABLE_ATTACK_MOVE_IDS_BY_SPECIES } from '../data/learnableAttackMoves';
 import { POKEMON_ABILITY_NAMES_BY_SPECIES } from '../data/pokemonAbilities';
-import type { StatKey, SpeciesOption, MoveOption, MoveCategory } from './types';
+import type { StatKey, SpeciesOption, MoveOption, MoveCategory, MoveMultiHitOption } from './types';
 import { STAT_LABELS } from './types';
 
 export const GEN = Generations.get(9);
@@ -27,6 +27,8 @@ interface CalcMove {
   type: string;
   category?: string;
   basePower?: number;
+  multihit?: number | number[];
+  multiaccuracy?: boolean;
 }
 
 function compareByName<T extends { name: string }>(left: T, right: T): number {
@@ -56,6 +58,39 @@ function abilityOptionsForSpecies(species: CalcSpecies): string[] {
     ),
   ]
     .sort((left, right) => left.localeCompare(right, 'en'));
+}
+
+function rangeInclusive(min: number, max: number): number[] {
+  return Array.from({ length: max - min + 1 }, (_, index) => min + index);
+}
+
+function multiHitOptionForMove(move: CalcMove): MoveMultiHitOption | undefined {
+  const multiHit = move.multihit;
+  if (!multiHit) return undefined;
+
+  if (Array.isArray(multiHit)) {
+    const [min, max] = multiHit;
+
+    return {
+      min,
+      max,
+      defaultHits: min + 1,
+      selectableHits: rangeInclusive(min, max),
+      supportsSkillLink: min === 2 && max === 5,
+      supportsLoadedDice: min === 2 && max === 5,
+      multiAccuracy: Boolean(move.multiaccuracy),
+    };
+  }
+
+  return {
+    min: move.multiaccuracy ? 1 : multiHit,
+    max: multiHit,
+    defaultHits: multiHit,
+    selectableHits: move.multiaccuracy ? rangeInclusive(1, multiHit) : [multiHit],
+    supportsSkillLink: false,
+    supportsLoadedDice: false,
+    multiAccuracy: Boolean(move.multiaccuracy),
+  };
 }
 
 const ALL_SPECIES = Array.from(GEN.species).map((species) => species as CalcSpecies);
@@ -151,6 +186,7 @@ export const MOVE_OPTIONS: MoveOption[] = Array.from(GEN.moves)
     type: move.type,
     category: move.category as MoveCategory,
     basePower: move.basePower ?? 0,
+    multiHit: multiHitOptionForMove(move),
   }))
   .sort(compareByDisplayName);
 

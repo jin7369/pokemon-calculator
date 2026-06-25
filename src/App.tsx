@@ -8,6 +8,7 @@ import {
   STAT_KEYS,
   type AttackConfig,
   type DefenderBulkConfig,
+  type HitCountSetting,
   type MoveOption,
   type SpeciesOption,
   type SortKey,
@@ -43,6 +44,11 @@ import {
   getOffenseItemOption,
   offenseItemMultiplierForMove,
 } from './domain/offenseItems';
+import {
+  describeHitCountSource,
+  formatMoveHitRange,
+  resolveAttackHitCount,
+} from './domain/multiHit';
 
 type TabKey = 'attack' | 'defense' | 'speed';
 
@@ -65,6 +71,7 @@ const INITIAL_ATTACK: AttackConfig = {
   item: NO_OFFENSE_ITEM_ID,
   ability: 'Blaze',
   abilityEnabled: false,
+  hitCount: 'auto',
   nature: 'Modest',
   attackStatPoints: { atk: 0, spa: 31 },
   boostStage: 0,
@@ -94,6 +101,14 @@ function formatPercent(value: number): string {
 
 function formatBoost(stage: number): string {
   return stage > 0 ? `+${stage}` : `${stage}`;
+}
+
+function parseHitCountSetting(value: string): HitCountSetting {
+  return value === 'auto' ? 'auto' : Number(value);
+}
+
+function formatHitCountOption(hits: number): string {
+  return `${hits}히트`;
 }
 
 function useDebouncedValue<T>(value: T, delayMs: number): T {
@@ -375,7 +390,12 @@ function MovePicker({
             <small>{selected?.name ?? '포켓몬을 먼저 선택'}</small>
           </span>
           {selected ? <TypeBadge type={selected.type} /> : null}
-          {selected ? <span className="pokemon-picker__selected-total">{selected.category} · 위력 {selected.basePower}</span> : null}
+          {selected ? (
+            <span className="pokemon-picker__selected-total">
+              {selected.category} · 위력 {selected.basePower}
+              {formatMoveHitRange(selected) ? ` · ${formatMoveHitRange(selected)}` : ''}
+            </span>
+          ) : null}
         </button>
       </div>
 
@@ -423,6 +443,12 @@ function MovePicker({
                       <small>위력</small>
                       <strong>{option.basePower}</strong>
                     </span>
+                    {option.multiHit ? (
+                      <span>
+                        <small>히트</small>
+                        <strong>{formatMoveHitRange(option)}</strong>
+                      </span>
+                    ) : null}
                   </span>
                 </button>
               ))
@@ -524,6 +550,7 @@ function App() {
   const selectedMove = selectedMoveName ? getMoveOption(selectedMoveName) : null;
   const selectedMoveIsLearnable = selectedAttackerMoveOptions.some((move) => move.name === selectedMoveName);
   const selectedLearnableMove = selectedMoveIsLearnable ? selectedMove : null;
+  const selectedHitCount = resolveAttackHitCount(attack, selectedLearnableMove);
   const selectedItem = getOffenseItemOption(attack.item);
   const itemMultiplier = offenseItemMultiplierForMove(attack.item, selectedLearnableMove);
   const finalAttackMultiplier = combinedAttackMultiplier(attack.item, selectedLearnableMove, attack.directMultiplier);
@@ -553,6 +580,13 @@ function App() {
       return { ...current, ability: selectedAttackerAbilities[0] };
     });
   }, [selectedAttackerAbilities]);
+
+  useEffect(() => {
+    if (attack.hitCount === 'auto') return;
+    if (selectedLearnableMove?.multiHit?.selectableHits.includes(attack.hitCount)) return;
+
+    setAttack((current) => ({ ...current, hitCount: 'auto' }));
+  }, [attack.hitCount, selectedLearnableMove]);
 
   const calculationAttack = useMemo<AttackConfig | null>(() => {
     const calculationAttacker = resolveSpeciesName(debouncedAttack.attacker);
@@ -709,6 +743,45 @@ function App() {
                   <TypeBadge type={selectedLearnableMove.type} />
                   <span>{selectedLearnableMove.category}</span>
                   <span>위력 {selectedLearnableMove.basePower}</span>
+                  {selectedHitCount ? <span>{selectedHitCount.hits}히트</span> : null}
+                </div>
+              ) : null}
+
+              {selectedLearnableMove?.multiHit && selectedHitCount ? (
+                <div className="multi-hit-panel">
+                  <div className="multi-hit-panel__header">
+                    <span>다단히트</span>
+                    <strong>{selectedHitCount.hits}히트</strong>
+                  </div>
+
+                  {selectedLearnableMove.multiHit.selectableHits.length > 1 ? (
+                    <label className="field-label">
+                      <span>히트 수</span>
+                      <select
+                        value={String(attack.hitCount)}
+                        onChange={(event) => setAttack((current) => ({
+                          ...current,
+                          hitCount: parseHitCountSetting(event.target.value),
+                        }))}
+                      >
+                        <option value="auto">
+                          자동 ({formatHitCountOption(resolveAttackHitCount(
+                            { ...attack, hitCount: 'auto' },
+                            selectedLearnableMove,
+                          )?.hits ?? selectedLearnableMove.multiHit.defaultHits)})
+                        </option>
+                        {selectedLearnableMove.multiHit.selectableHits.map((hits) => (
+                          <option key={hits} value={hits}>{formatHitCountOption(hits)}</option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
+
+                  <small>
+                    {describeHitCountSource(selectedHitCount.source)}
+                    {selectedLearnableMove.multiHit.supportsLoadedDice ? ' · 속임수주사위 자동 4히트' : ''}
+                    {selectedLearnableMove.multiHit.supportsSkillLink ? ' · 스킬링크 자동 5히트' : ''}
+                  </small>
                 </div>
               ) : null}
 

@@ -66,6 +66,17 @@ describe('pokemon Korean display names', () => {
     expect(getLearnableAttackMoveOptionsForSpecies('Gholdengo').some((move) => move.name === 'Thunderbolt')).toBe(true);
     expect(getLearnableAttackMoveOptionsForSpecies('Caterpie')).toEqual([]);
   });
+
+  it('stores multi-hit metadata on attacking moves', () => {
+    expect(getMoveOption('Icicle Spear')?.multiHit).toMatchObject({
+      min: 2,
+      max: 5,
+      defaultHits: 3,
+      supportsSkillLink: true,
+      supportsLoadedDice: true,
+    });
+    expect(getMoveOption('Population Bomb')?.multiHit?.selectableHits).toHaveLength(10);
+  });
 });
 
 describe('move Korean display names', () => {

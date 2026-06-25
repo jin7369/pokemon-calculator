@@ -13,6 +13,7 @@ import type {
 } from './types';
 import { BATTLE_LEVEL, GEN, getMoveOption, POKEMON_OPTIONS } from './pokemonData';
 import { combinedAttackMultiplier } from './offenseItems';
+import { resolveAttackHitCount } from './multiHit';
 import { statPointsToEvs } from './statPoints';
 
 const EMPTY_BOOSTS: StatsTable = {
@@ -97,11 +98,15 @@ export function calculateAttackResults(
   const offensiveStat = offensiveStatForCategory(moveOption.category);
   const finalMultiplier = combinedAttackMultiplier(attack.item, moveOption, attack.directMultiplier);
   const attackerAbility = attack.abilityEnabled && attack.ability ? attack.ability : NO_ABILITY;
+  const resolvedHitCount = resolveAttackHitCount(attack, moveOption);
   const attackerEvs = statPointsToEvs({
     [offensiveStat]: attack.attackStatPoints[offensiveStat],
   });
   const defenderEvs = statPointsToEvs(defenderBulk.statPoints);
-  const move = new Move(GEN, moveOption.name);
+  const move = new Move(GEN, moveOption.name, {
+    ability: attackerAbility,
+    hits: resolvedHitCount?.hits,
+  });
   const attacker = new Pokemon(GEN, attack.attacker, {
     level: BATTLE_LEVEL,
     ability: attackerAbility,

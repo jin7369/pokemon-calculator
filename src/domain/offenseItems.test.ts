@@ -35,4 +35,8 @@ describe('offense item multipliers', () => {
   it('combines item and direct multipliers', () => {
     expect(combinedAttackMultiplier('life-orb', flamethrower, 2)).toBe(2.6);
   });
+
+  it('does not treat Loaded Dice as a direct power multiplier', () => {
+    expect(offenseItemMultiplierForMove('loaded-dice', flamethrower)).toBe(1);
+  });
 });

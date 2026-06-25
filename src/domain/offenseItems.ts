@@ -9,9 +9,11 @@ export interface OffenseItemOption {
 }
 
 export const NO_OFFENSE_ITEM_ID = 'none';
+export const LOADED_DICE_ITEM_ID = 'loaded-dice';
 
 export const OFFENSE_ITEM_OPTIONS: OffenseItemOption[] = [
   { id: NO_OFFENSE_ITEM_ID, label: '없음', multiplier: 1 },
+  { id: LOADED_DICE_ITEM_ID, label: '속임수주사위', multiplier: 1 },
   { id: 'life-orb', label: '생명의구슬', multiplier: 1.3 },
   { id: 'choice-band', label: '구애머리띠', multiplier: 1.5, moveCategory: 'Physical' },
   { id: 'choice-specs', label: '구애안경', multiplier: 1.5, moveCategory: 'Special' },

@@ -28,6 +28,7 @@ describe('damage helpers', () => {
       item: 'none',
       ability: 'Blaze',
       abilityEnabled: false,
+      hitCount: 'auto',
       nature: 'Modest',
       attackStatPoints: { atk: 0, spa: 31 },
       boostStage: 0,
@@ -49,6 +50,7 @@ describe('damage helpers', () => {
       item: 'none',
       ability: 'Static',
       abilityEnabled: false,
+      hitCount: 'auto',
       nature: 'Modest',
       attackStatPoints: { atk: 0, spa: 31 },
       boostStage: 0,
@@ -70,6 +72,7 @@ describe('damage helpers', () => {
       item: 'none',
       ability: 'Blaze',
       abilityEnabled: false,
+      hitCount: 'auto',
       nature: 'Modest',
       attackStatPoints: { atk: 0, spa: 31 },
       boostStage: 0,
@@ -90,6 +93,59 @@ describe('damage helpers', () => {
       item: 'none',
       ability: 'Huge Power',
       abilityEnabled: false,
+      hitCount: 'auto',
+      nature: 'Adamant',
+      attackStatPoints: { atk: 31, spa: 0 },
+      boostStage: 0,
+      directMultiplier: 1,
+    };
+
+    const disabled = calculateAttackResults(attack, neutralBulk, charizard ? [charizard] : []).results[0];
+    const enabled = calculateAttackResults(
+      { ...attack, abilityEnabled: true },
+      neutralBulk,
+      charizard ? [charizard] : [],
+    ).results[0];
+
+    expect(disabled.maxDamage).toBeGreaterThan(0);
+    expect(enabled.maxDamage).toBeGreaterThan(disabled.maxDamage);
+  });
+
+  it('uses a manually selected hit count for variable multi-hit moves', () => {
+    const charizard = getSpeciesOption('Charizard');
+    const attack: AttackConfig = {
+      attacker: 'Cloyster',
+      move: 'Icicle Spear',
+      item: 'none',
+      ability: 'Skill Link',
+      abilityEnabled: false,
+      hitCount: 2,
+      nature: 'Adamant',
+      attackStatPoints: { atk: 31, spa: 0 },
+      boostStage: 0,
+      directMultiplier: 1,
+    };
+
+    const twoHits = calculateAttackResults(attack, neutralBulk, charizard ? [charizard] : []).results[0];
+    const fiveHits = calculateAttackResults(
+      { ...attack, hitCount: 5 },
+      neutralBulk,
+      charizard ? [charizard] : [],
+    ).results[0];
+
+    expect(twoHits.maxDamage).toBeGreaterThan(0);
+    expect(fiveHits.maxDamage).toBeGreaterThan(twoHits.maxDamage);
+  });
+
+  it('uses Skill Link for automatic variable multi-hit moves when enabled', () => {
+    const charizard = getSpeciesOption('Charizard');
+    const attack: AttackConfig = {
+      attacker: 'Cloyster',
+      move: 'Icicle Spear',
+      item: 'none',
+      ability: 'Skill Link',
+      abilityEnabled: false,
+      hitCount: 'auto',
       nature: 'Adamant',
       attackStatPoints: { atk: 31, spa: 0 },
       boostStage: 0,

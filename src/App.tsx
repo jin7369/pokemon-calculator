@@ -4,24 +4,27 @@ import './App.css';
 import {
   CATEGORY_LABELS,
   EMPTY_SPREAD,
+  NATURE_STAT_KEYS,
   STAT_LABELS,
   STAT_KEYS,
   type AttackConfig,
   type DefenderBulkConfig,
   type HitCountSetting,
   type MoveOption,
+  type NatureStatKey,
   type SpeciesOption,
   type SortKey,
   type StatKey,
   type SurvivalCategory,
 } from './domain/types';
 import {
-  NATURE_OPTIONS,
   POKEMON_OPTIONS,
   POKEMON_RULESET,
   getLearnableAttackMoveOptionsForSpecies,
   getMoveOption,
   getSpeciesOption,
+  natureModifiersForName,
+  natureNameForModifiers,
   resolveMoveName,
   resolveSpeciesName,
 } from './domain/pokemonData';
@@ -110,6 +113,15 @@ function formatHitCountOption(hits: number): string {
   return `${hits}히트`;
 }
 
+function defaultRaisedStatForLowered(lowered: NatureStatKey): NatureStatKey {
+  return lowered === 'atk' ? 'spa' : 'atk';
+}
+
+function defaultLoweredStatForRaised(raised: NatureStatKey): NatureStatKey {
+  if (raised === 'atk') return 'spa';
+  return 'atk';
+}
+
 function useDebouncedValue<T>(value: T, delayMs: number): T {
   const [debouncedValue, setDebouncedValue] = useState(value);
 
@@ -185,6 +197,94 @@ function StatPointControl({
       />
       <span className="stat-control__total">{total}/{STAT_POINT_TOTAL_LIMIT}</span>
     </label>
+  );
+}
+
+function NatureModifierPicker({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const modifiers = natureModifiersForName(value);
+  let modifierText = '무보정';
+
+  if (modifiers.plus && modifiers.minus) {
+    modifierText = `+${STAT_LABELS[modifiers.plus]} / -${STAT_LABELS[modifiers.minus]}`;
+  }
+
+  function setRaisedStat(nextValue: string) {
+    if (nextValue === 'neutral') {
+      onChange(natureNameForModifiers(null, null));
+      return;
+    }
+
+    const nextRaised = nextValue as NatureStatKey;
+    const nextLowered = modifiers.minus && modifiers.minus !== nextRaised
+      ? modifiers.minus
+      : defaultLoweredStatForRaised(nextRaised);
+
+    onChange(natureNameForModifiers(nextRaised, nextLowered));
+  }
+
+  function setLoweredStat(nextValue: string) {
+    if (nextValue === 'neutral') {
+      onChange(natureNameForModifiers(null, null));
+      return;
+    }
+
+    const nextLowered = nextValue as NatureStatKey;
+    const nextRaised = modifiers.plus && modifiers.plus !== nextLowered
+      ? modifiers.plus
+      : defaultRaisedStatForLowered(nextLowered);
+
+    onChange(natureNameForModifiers(nextRaised, nextLowered));
+  }
+
+  return (
+    <div className="nature-picker">
+      <div className="nature-picker__header">
+        <span>{label}</span>
+        <strong>{value}</strong>
+      </div>
+
+      <div className="nature-picker__fields">
+        <label className="field-label">
+          <span>올리는 능력치</span>
+          <select
+            value={modifiers.plus ?? 'neutral'}
+            onChange={(event) => setRaisedStat(event.target.value)}
+          >
+            <option value="neutral">없음</option>
+            {NATURE_STAT_KEYS.map((stat) => (
+              <option key={stat} value={stat}>
+                {STAT_LABELS[stat]}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="field-label">
+          <span>내리는 능력치</span>
+          <select
+            value={modifiers.minus ?? 'neutral'}
+            onChange={(event) => setLoweredStat(event.target.value)}
+          >
+            <option value="neutral">없음</option>
+            {NATURE_STAT_KEYS.map((stat) => (
+              <option key={stat} value={stat}>
+                {STAT_LABELS[stat]}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <small>{modifierText}</small>
+    </div>
   );
 }
 
@@ -808,17 +908,11 @@ function App() {
                 <small>{selectedItem.label}</small>
               </div>
 
-              <label className="field-label">
-                <span>성격</span>
-                <select
-                  value={attack.nature}
-                  onChange={(event) => setAttack((current) => ({ ...current, nature: event.target.value }))}
-                >
-                  {NATURE_OPTIONS.map((nature) => (
-                    <option key={nature.name} value={nature.name}>{nature.label}</option>
-                  ))}
-                </select>
-              </label>
+              <NatureModifierPicker
+                label="성격"
+                value={attack.nature}
+                onChange={(value) => setAttack((current) => ({ ...current, nature: value }))}
+              />
 
               <div className="stat-block">
                 <div className="stat-block__header">
@@ -872,17 +966,11 @@ function App() {
                 <h2>공통 방어 조건</h2>
               </div>
 
-              <label className="field-label">
-                <span>성격</span>
-                <select
-                  value={defenderBulk.nature}
-                  onChange={(event) => setDefenderBulk((current) => ({ ...current, nature: event.target.value }))}
-                >
-                  {NATURE_OPTIONS.map((nature) => (
-                    <option key={nature.name} value={nature.name}>{nature.label}</option>
-                  ))}
-                </select>
-              </label>
+              <NatureModifierPicker
+                label="성격"
+                value={defenderBulk.nature}
+                onChange={(value) => setDefenderBulk((current) => ({ ...current, nature: value }))}
+              />
 
               <div className="stat-block">
                 <div className="stat-block__header">

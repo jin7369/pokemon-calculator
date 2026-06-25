@@ -6,6 +6,9 @@ import {
   getLearnableAttackMoveOptionsForSpecies,
   getSpeciesOption,
   MOVE_OPTIONS,
+  NATURE_OPTIONS,
+  natureModifiersForName,
+  natureNameForModifiers,
   POKEMON_OPTIONS,
   resolveMoveName,
   resolveSpeciesName,
@@ -106,5 +109,49 @@ describe('move Korean display names', () => {
 
   it('keeps move option display names unique', () => {
     expect(new Set(MOVE_OPTIONS.map((move) => move.displayName)).size).toBe(MOVE_OPTIONS.length);
+  });
+});
+
+describe('nature options', () => {
+  it('keeps only one neutral nature option', () => {
+    const neutralNatures = NATURE_OPTIONS.filter((nature) => nature.label.includes('무보정'));
+    const natureNames = NATURE_OPTIONS.map((nature) => nature.name);
+
+    expect(neutralNatures).toEqual([
+      { id: 'serious', name: 'Serious', label: 'Serious (무보정)', plus: null, minus: null },
+    ]);
+    expect(natureNames).not.toContain('Hardy');
+    expect(natureNames).not.toContain('Docile');
+    expect(natureNames).not.toContain('Bashful');
+    expect(natureNames).not.toContain('Quirky');
+  });
+
+  it('keeps boosted nature labels explicit', () => {
+    expect(NATURE_OPTIONS[0]).toEqual({
+      id: 'serious',
+      name: 'Serious',
+      label: 'Serious (무보정)',
+      plus: null,
+      minus: null,
+    });
+    expect(NATURE_OPTIONS).toContainEqual({
+      id: 'modest',
+      name: 'Modest',
+      label: 'Modest (+특공 / -공격)',
+      plus: 'spa',
+      minus: 'atk',
+    });
+  });
+
+  it('maps nature modifiers back to calc nature names', () => {
+    expect(natureNameForModifiers('spa', 'atk')).toBe('Modest');
+    expect(natureNameForModifiers('atk', 'spa')).toBe('Adamant');
+    expect(natureNameForModifiers(null, null)).toBe('Serious');
+    expect(natureNameForModifiers('atk', 'atk')).toBe('Serious');
+  });
+
+  it('maps calc nature names to stat modifiers', () => {
+    expect(natureModifiersForName('Modest')).toEqual({ plus: 'spa', minus: 'atk' });
+    expect(natureModifiersForName('Serious')).toEqual({ plus: null, minus: null });
   });
 });

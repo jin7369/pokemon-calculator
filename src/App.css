@@ -556,6 +556,49 @@ h2 {
   font-weight: 800;
 }
 
+.nature-picker {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #e4e7eb;
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 10px;
+}
+
+.nature-picker__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #354352;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.nature-picker__header strong {
+  min-height: 26px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #111827;
+  font-size: 12px;
+  padding: 0 8px;
+}
+
+.nature-picker__fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.nature-picker small {
+  color: #697586;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
 .ability-panel {
   display: grid;
   gap: 10px;
@@ -1052,6 +1095,10 @@ tbody tr:hover {
 @media (max-width: 560px) {
   .inline-fields .field-label {
     width: 100%;
+  }
+
+  .nature-picker__fields {
+    grid-template-columns: 1fr;
   }
 }
 

@@ -2,6 +2,7 @@
 
 export type StatKey = StatID;
 export type CombatStatKey = Exclude<StatKey, 'hp'>;
+export type NatureStatKey = CombatStatKey;
 export type MoveCategory = 'Physical' | 'Special';
 export type SortKey = 'maxPercentDesc' | 'maxPercentAsc' | 'nameAsc' | 'hpDesc';
 export type SurvivalCategory = 'survives' | 'roll' | 'ko';
@@ -77,6 +78,7 @@ export interface DamageSummary {
 }
 
 export const STAT_KEYS: StatKey[] = ['hp', 'atk', 'def', 'spa', 'spd', 'spe'];
+export const NATURE_STAT_KEYS: NatureStatKey[] = ['atk', 'def', 'spa', 'spd', 'spe'];
 
 export const STAT_LABELS: Record<StatKey, string> = {
   hp: 'HP',

@@ -5,12 +5,14 @@ import { POKEMON_KOREAN_NAMES } from '../data/pokemonKoreanNames';
 import { CHAMPIONS_CURRENT_RULESET } from '../data/championsRulesets';
 import { LEARNABLE_ATTACK_MOVE_IDS_BY_SPECIES } from '../data/learnableAttackMoves';
 import { POKEMON_ABILITY_NAMES_BY_SPECIES } from '../data/pokemonAbilities';
-import type { StatKey, SpeciesOption, MoveOption, MoveCategory, MoveMultiHitOption } from './types';
+import type { StatKey, SpeciesOption, MoveOption, MoveCategory, MoveMultiHitOption, NatureStatKey } from './types';
 import { STAT_LABELS } from './types';
 
 export const GEN = Generations.get(9);
 export const BATTLE_LEVEL = 50;
 export const POKEMON_RULESET = CHAMPIONS_CURRENT_RULESET;
+const NEUTRAL_NATURE_NAME = 'Serious';
+const NEUTRAL_NATURE_KEY = 'neutral:neutral';
 
 interface CalcSpecies {
   id: string;
@@ -194,17 +196,57 @@ export const NATURE_OPTIONS = Array.from(GEN.natures)
   .map((nature) => {
     const plus = nature.plus as StatKey | undefined;
     const minus = nature.minus as StatKey | undefined;
-    const modifier = plus && minus && plus !== minus
-      ? `+${STAT_LABELS[plus]} / -${STAT_LABELS[minus]}`
-      : '보정 없음';
+    const isNeutral = !plus || !minus || plus === minus;
+    const modifier = isNeutral ? '무보정' : `+${STAT_LABELS[plus]} / -${STAT_LABELS[minus]}`;
 
     return {
       id: nature.id,
       name: nature.name,
       label: `${nature.name} (${modifier})`,
+      plus: isNeutral ? null : plus as NatureStatKey,
+      minus: isNeutral ? null : minus as NatureStatKey,
+      isNeutral,
     };
   })
-  .sort(compareByName);
+  .filter((nature) => !nature.isNeutral || nature.name === NEUTRAL_NATURE_NAME)
+  .sort((left, right) => {
+    if (left.isNeutral !== right.isNeutral) return left.isNeutral ? -1 : 1;
+    return compareByName(left, right);
+  })
+  .map((nature) => ({
+    id: nature.id,
+    name: nature.name,
+    label: nature.label,
+    plus: nature.plus,
+    minus: nature.minus,
+  }));
+
+function natureModifierKey(plus: NatureStatKey | null, minus: NatureStatKey | null): string {
+  if (!plus || !minus || plus === minus) return NEUTRAL_NATURE_KEY;
+  return `${plus}:${minus}`;
+}
+
+const natureByModifierKey = new Map<string, string>(
+  NATURE_OPTIONS.map((nature) => [natureModifierKey(nature.plus, nature.minus), nature.name]),
+);
+const natureByName = new Map<string, (typeof NATURE_OPTIONS)[number]>(
+  NATURE_OPTIONS.map((nature) => [nature.name, nature]),
+);
+
+export function natureNameForModifiers(
+  plus: NatureStatKey | null,
+  minus: NatureStatKey | null,
+): string {
+  return natureByModifierKey.get(natureModifierKey(plus, minus)) ?? NEUTRAL_NATURE_NAME;
+}
+
+export function natureModifiersForName(name: string): { plus: NatureStatKey | null; minus: NatureStatKey | null } {
+  const nature = natureByName.get(name);
+  return {
+    plus: nature?.plus ?? null,
+    minus: nature?.minus ?? null,
+  };
+}
 
 const speciesNameIndex = new Map<string, string>();
 

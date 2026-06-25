@@ -57,11 +57,14 @@ const INPUT_DEBOUNCE_MS = 180;
 const SEARCH_DEBOUNCE_MS = 120;
 const POKEMON_PICKER_PAGE_SIZE = 10;
 const MOVE_PICKER_PAGE_SIZE = 10;
+const EMPTY_ABILITY_OPTIONS: string[] = [];
 
 const INITIAL_ATTACK: AttackConfig = {
   attacker: '리자몽',
   move: '화염방사',
   item: NO_OFFENSE_ITEM_ID,
+  ability: 'Blaze',
+  abilityEnabled: false,
   nature: 'Modest',
   attackStatPoints: { atk: 0, spa: 31 },
   boostStage: 0,
@@ -512,6 +515,7 @@ function App() {
 
   const selectedAttacker = resolveSpeciesName(attack.attacker);
   const selectedAttackerOption = selectedAttacker ? getSpeciesOption(selectedAttacker) : null;
+  const selectedAttackerAbilities = selectedAttackerOption?.abilities ?? EMPTY_ABILITY_OPTIONS;
   const selectedAttackerMoveOptions = useMemo(
     () => getLearnableAttackMoveOptionsForSpecies(selectedAttacker),
     [selectedAttacker],
@@ -537,6 +541,18 @@ function App() {
       move: selectedAttackerMoveOptions[0].displayName,
     }));
   }, [attack.move, selectedAttacker, selectedAttackerMoveOptions]);
+
+  useEffect(() => {
+    setAttack((current) => {
+      if (selectedAttackerAbilities.length === 0) {
+        if (current.ability === '' && !current.abilityEnabled) return current;
+        return { ...current, ability: '', abilityEnabled: false };
+      }
+
+      if (selectedAttackerAbilities.includes(current.ability)) return current;
+      return { ...current, ability: selectedAttackerAbilities[0] };
+    });
+  }, [selectedAttackerAbilities]);
 
   const calculationAttack = useMemo<AttackConfig | null>(() => {
     const calculationAttacker = resolveSpeciesName(debouncedAttack.attacker);
@@ -647,6 +663,38 @@ function App() {
               />
 
               <BaseStatsTable species={selectedAttackerOption} />
+
+              <div className="ability-panel">
+                <label className="ability-toggle">
+                  <input
+                    type="checkbox"
+                    checked={attack.abilityEnabled}
+                    disabled={selectedAttackerAbilities.length === 0}
+                    onChange={(event) => setAttack((current) => ({ ...current, abilityEnabled: event.target.checked }))}
+                  />
+                  <span>
+                    <strong>공격 특성 적용</strong>
+                    <small>{attack.abilityEnabled && attack.ability ? attack.ability : 'OFF'}</small>
+                  </span>
+                </label>
+
+                <label className="field-label">
+                  <span>공격 특성</span>
+                  <select
+                    value={attack.ability}
+                    disabled={selectedAttackerAbilities.length === 0}
+                    onChange={(event) => setAttack((current) => ({ ...current, ability: event.target.value }))}
+                  >
+                    {selectedAttackerAbilities.length === 0 ? (
+                      <option value="">선택 가능 특성 없음</option>
+                    ) : (
+                      selectedAttackerAbilities.map((ability) => (
+                        <option key={ability} value={ability}>{ability}</option>
+                      ))
+                    )}
+                  </select>
+                </label>
+              </div>
 
               <MovePicker
                 label="공격 기술"

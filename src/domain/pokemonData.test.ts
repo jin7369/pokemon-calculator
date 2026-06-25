@@ -31,6 +31,11 @@ describe('pokemon Korean display names', () => {
     expect(getSpeciesOption('Pikachu')?.displayName).toBe('피카츄');
   });
 
+  it('stores selectable abilities on species options', () => {
+    expect(getSpeciesOption('Charizard')?.abilities).toContain('Blaze');
+    expect(getSpeciesOption('Charizard')?.abilities).toContain('Solar Power');
+  });
+
   it('disambiguates localized form names that would otherwise collide', () => {
     expect(displayNameForSpecies('Kommo-o')).toBe('짜랑고우거');
     expect(getSpeciesOption('Kommo-o')?.displayName).toBe('짜랑고우거');

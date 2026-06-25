@@ -4,6 +4,7 @@ import { MOVE_NAME_OVERRIDES } from '../data/moveNameOverrides';
 import { POKEMON_KOREAN_NAMES } from '../data/pokemonKoreanNames';
 import { CHAMPIONS_CURRENT_RULESET } from '../data/championsRulesets';
 import { LEARNABLE_ATTACK_MOVE_IDS_BY_SPECIES } from '../data/learnableAttackMoves';
+import { POKEMON_ABILITY_NAMES_BY_SPECIES } from '../data/pokemonAbilities';
 import type { StatKey, SpeciesOption, MoveOption, MoveCategory } from './types';
 import { STAT_LABELS } from './types';
 
@@ -16,6 +17,7 @@ interface CalcSpecies {
   name: string;
   baseSpecies?: string;
   types: string[];
+  abilities?: Record<string, string>;
   baseStats: Record<StatKey, number>;
 }
 
@@ -41,6 +43,19 @@ function koreanPokemonNameFor(name: string): string {
 
 function koreanMoveNameFor(name: string): string {
   return MOVE_NAME_OVERRIDES[name] ?? MOVE_KOREAN_NAMES[name as keyof typeof MOVE_KOREAN_NAMES] ?? name;
+}
+
+function abilityOptionsForSpecies(species: CalcSpecies): string[] {
+  const generatedAbilities =
+    POKEMON_ABILITY_NAMES_BY_SPECIES[species.name as keyof typeof POKEMON_ABILITY_NAMES_BY_SPECIES];
+  const abilities = generatedAbilities ?? Object.values(species.abilities ?? {});
+
+  return [
+    ...new Set(
+      abilities.filter((ability) => typeof ability === 'string' && ability.length > 0),
+    ),
+  ]
+    .sort((left, right) => left.localeCompare(right, 'en'));
 }
 
 const ALL_SPECIES = Array.from(GEN.species).map((species) => species as CalcSpecies);
@@ -115,6 +130,7 @@ const RAW_POKEMON_OPTIONS: SpeciesOption[] = ALL_SPECIES
     name: species.name,
     displayName: displayNameForSpecies(species.name),
     types: [...species.types],
+    abilities: abilityOptionsForSpecies(species),
     baseStats: { ...species.baseStats },
   }));
 

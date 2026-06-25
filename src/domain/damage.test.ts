@@ -26,6 +26,8 @@ describe('damage helpers', () => {
       attacker: 'Charizard',
       move: 'Flamethrower',
       item: 'none',
+      ability: 'Blaze',
+      abilityEnabled: false,
       nature: 'Modest',
       attackStatPoints: { atk: 0, spa: 31 },
       boostStage: 0,
@@ -45,6 +47,8 @@ describe('damage helpers', () => {
       attacker: 'Pikachu',
       move: 'Thunderbolt',
       item: 'none',
+      ability: 'Static',
+      abilityEnabled: false,
       nature: 'Modest',
       attackStatPoints: { atk: 0, spa: 31 },
       boostStage: 0,
@@ -56,5 +60,50 @@ describe('damage helpers', () => {
     expect(results).toHaveLength(1);
     expect(results[0].maxDamage).toBe(0);
     expect(results[0].category).toBe('survives');
+  });
+
+  it('does not apply default abilities implicitly', () => {
+    const ceruledge = getSpeciesOption('Ceruledge');
+    const attack: AttackConfig = {
+      attacker: 'Charizard',
+      move: 'Flamethrower',
+      item: 'none',
+      ability: 'Blaze',
+      abilityEnabled: false,
+      nature: 'Modest',
+      attackStatPoints: { atk: 0, spa: 31 },
+      boostStage: 0,
+      directMultiplier: 1,
+    };
+
+    const { results } = calculateAttackResults(attack, neutralBulk, ceruledge ? [ceruledge] : []);
+
+    expect(results).toHaveLength(1);
+    expect(results[0].maxDamage).toBeGreaterThan(0);
+  });
+
+  it('applies the selected attacker ability only when enabled', () => {
+    const charizard = getSpeciesOption('Charizard');
+    const attack: AttackConfig = {
+      attacker: 'Azumarill',
+      move: 'Liquidation',
+      item: 'none',
+      ability: 'Huge Power',
+      abilityEnabled: false,
+      nature: 'Adamant',
+      attackStatPoints: { atk: 31, spa: 0 },
+      boostStage: 0,
+      directMultiplier: 1,
+    };
+
+    const disabled = calculateAttackResults(attack, neutralBulk, charizard ? [charizard] : []).results[0];
+    const enabled = calculateAttackResults(
+      { ...attack, abilityEnabled: true },
+      neutralBulk,
+      charizard ? [charizard] : [],
+    ).results[0];
+
+    expect(disabled.maxDamage).toBeGreaterThan(0);
+    expect(enabled.maxDamage).toBeGreaterThan(disabled.maxDamage);
   });
 });

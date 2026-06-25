@@ -23,6 +23,7 @@ const EMPTY_BOOSTS: StatsTable = {
   spd: 0,
   spe: 0,
 };
+const NO_ABILITY = 'No Ability';
 
 export function offensiveStatForCategory(category: MoveCategory): 'atk' | 'spa' {
   return category === 'Physical' ? 'atk' : 'spa';
@@ -95,6 +96,7 @@ export function calculateAttackResults(
 
   const offensiveStat = offensiveStatForCategory(moveOption.category);
   const finalMultiplier = combinedAttackMultiplier(attack.item, moveOption, attack.directMultiplier);
+  const attackerAbility = attack.abilityEnabled && attack.ability ? attack.ability : NO_ABILITY;
   const attackerEvs = statPointsToEvs({
     [offensiveStat]: attack.attackStatPoints[offensiveStat],
   });
@@ -102,6 +104,7 @@ export function calculateAttackResults(
   const move = new Move(GEN, moveOption.name);
   const attacker = new Pokemon(GEN, attack.attacker, {
     level: BATTLE_LEVEL,
+    ability: attackerAbility,
     nature: attack.nature,
     evs: attackerEvs,
     boosts: buildBoosts(offensiveStat, attack.boostStage),
@@ -113,6 +116,7 @@ export function calculateAttackResults(
     try {
       const defender = new Pokemon(GEN, target.name, {
         level: BATTLE_LEVEL,
+        ability: NO_ABILITY,
         nature: defenderBulk.nature,
         evs: defenderEvs,
       });

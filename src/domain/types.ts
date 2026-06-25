@@ -13,6 +13,7 @@ export interface SpeciesOption {
   name: string;
   displayName: string;
   types: string[];
+  abilities: string[];
   baseStats: Record<StatKey, number>;
 }
 
@@ -29,6 +30,8 @@ export interface AttackConfig {
   attacker: string;
   move: string;
   item: string;
+  ability: string;
+  abilityEnabled: boolean;
   nature: string;
   attackStatPoints: Pick<StatPointSpread, 'atk' | 'spa'>;
   boostStage: number;

@@ -12,6 +12,7 @@
     "verify:champions-roster": "node scripts/verifyChampionsRoster.mjs",
     "generate:korean-names": "node scripts/generateKoreanPokemonNames.mjs",
     "generate:move-names": "node scripts/generateKoreanMoveNames.mjs",
+    "generate:abilities": "node scripts/generatePokemonAbilities.mjs",
     "generate:learnable-moves": "node scripts/generateLearnableAttackMoves.mjs"
   },
   "dependencies": {

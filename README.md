@@ -129,6 +129,13 @@ PWA 관련 파일:
 
 GitHub Pages 배포 주소는 HTTPS이므로 모바일 브라우저에서 홈 화면 추가/PWA 설치가 가능합니다.
 
+## 라이선스 고지
+
+프로덕션 번들에 포함되는 런타임 의존성은 MIT/ISC 계열로 확인했습니다. 배포용 고지는 아래 파일에 정리합니다.
+
+- `THIRD_PARTY_NOTICES.md`
+- `public/third-party-notices.txt`
+
 ## 기술 스택
 
 - React

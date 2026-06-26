@@ -6,7 +6,7 @@ export type NatureStatKey = CombatStatKey;
 export type MoveCategory = 'Physical' | 'Special';
 export type SortKey = 'maxPercentDesc' | 'maxPercentAsc' | 'nameAsc' | 'hpDesc';
 export type SurvivalCategory = 'survives' | 'roll' | 'ko';
-export type SpeedSortKey = 'marginDesc' | 'targetSpeedDesc' | 'targetSpeedAsc' | 'nameAsc';
+export type SpeedSortKey = 'marginAsc' | 'marginDesc' | 'targetSpeedDesc' | 'targetSpeedAsc' | 'nameAsc';
 export type SpeedCategory = 'outspeeds' | 'tie' | 'slower';
 export type HitCountSetting = 'auto' | number;
 

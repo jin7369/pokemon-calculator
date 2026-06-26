@@ -691,7 +691,7 @@ function App() {
   const [defensePage, setDefensePage] = useState(0);
   const [speedFilters, setSpeedFilters] = useState<SpeedFilterState>(INITIAL_SPEED_FILTERS);
   const [speedSearch, setSpeedSearch] = useState('');
-  const [speedSortKey, setSpeedSortKey] = useState<SpeedSortKey>('marginDesc');
+  const [speedSortKey, setSpeedSortKey] = useState<SpeedSortKey>('marginAsc');
   const [speedPage, setSpeedPage] = useState(0);
 
   const debouncedAttack = useDebouncedValue(attack, INPUT_DEBOUNCE_MS);
@@ -1866,6 +1866,7 @@ function App() {
                   <label className="sort-box">
                     <SlidersHorizontal size={17} aria-hidden="true" />
                     <select value={speedSortKey} onChange={(event) => setSpeedSortKey(event.target.value as SpeedSortKey)}>
+                      <option value="marginAsc">추월 여유 낮은순</option>
                       <option value="marginDesc">추월 여유 높은순</option>
                       <option value="targetSpeedDesc">상대 스피드 높은순</option>
                       <option value="targetSpeedAsc">상대 스피드 낮은순</option>

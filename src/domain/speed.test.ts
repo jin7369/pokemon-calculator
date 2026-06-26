@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { calculateSpeedResults, classifySpeed, modifiedSpeed } from './speed';
+import { calculateSpeedResults, classifySpeed, modifiedSpeed, sortSpeedResults } from './speed';
 import { NO_SPEED_ITEM_ID } from './speedItems';
 import { getSpeciesOption } from './pokemonData';
-import type { SpeedConfig } from './types';
+import type { SpeedConfig, SpeedResult } from './types';
 
 const baseSpeedConfig: SpeedConfig = {
   pokemon: 'Charizard',
@@ -51,5 +51,32 @@ describe('speed helpers', () => {
     expect(results).toHaveLength(1);
     expect(results[0].category).toBe('tie');
     expect(results[0].margin).toBe(0);
+  });
+
+  it('sorts lowest outspeed margins before ties and slower targets', () => {
+    const result = (name: string, margin: number): SpeedResult => ({
+      id: name.toLowerCase(),
+      name,
+      displayName: name,
+      types: [],
+      selfBaseSpeed: 100,
+      selfFinalSpeed: 100,
+      targetBaseSpeed: 100 - margin,
+      targetFinalSpeed: 100 - margin,
+      margin,
+      category: classifySpeed(100, 100 - margin),
+    });
+
+    expect(sortSpeedResults([
+      result('SlowByThree', 3),
+      result('Tie', 0),
+      result('FasterByOne', -1),
+      result('SlowByOne', 1),
+    ], 'marginAsc').map((item) => item.name)).toEqual([
+      'SlowByOne',
+      'SlowByThree',
+      'Tie',
+      'FasterByOne',
+    ]);
   });
 });

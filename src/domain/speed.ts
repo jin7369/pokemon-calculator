@@ -47,8 +47,23 @@ export function sortSpeedResults(results: SpeedResult[], sortKey: SpeedSortKey):
   const sorted = [...results];
   const byName = (left: SpeedResult, right: SpeedResult) =>
     left.displayName.localeCompare(right.displayName, 'ko') || left.name.localeCompare(right.name, 'en');
+  const byLowestOutspeedMargin = (left: SpeedResult, right: SpeedResult) => {
+    const rank = (result: SpeedResult) => {
+      if (result.margin > 0) return 0;
+      if (result.margin === 0) return 1;
+      return 2;
+    };
+    const leftRank = rank(left);
+    const rightRank = rank(right);
+
+    if (leftRank !== rightRank) return leftRank - rightRank;
+    if (leftRank === 2) return Math.abs(left.margin) - Math.abs(right.margin) || byName(left, right);
+    return left.margin - right.margin || byName(left, right);
+  };
 
   switch (sortKey) {
+    case 'marginAsc':
+      return sorted.sort(byLowestOutspeedMargin);
     case 'targetSpeedDesc':
       return sorted.sort((left, right) => right.targetFinalSpeed - left.targetFinalSpeed || byName(left, right));
     case 'targetSpeedAsc':

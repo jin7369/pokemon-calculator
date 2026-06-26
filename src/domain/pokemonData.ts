@@ -3,6 +3,7 @@ import { MOVE_KOREAN_NAMES } from '../data/moveKoreanNames';
 import { MOVE_NAME_OVERRIDES } from '../data/moveNameOverrides';
 import { POKEMON_KOREAN_NAMES } from '../data/pokemonKoreanNames';
 import { CHAMPIONS_CURRENT_RULESET } from '../data/championsRulesets';
+import { CHAMPIONS_ATTACK_MOVE_IDS } from '../data/championsAttackMoves';
 import { LEARNABLE_ATTACK_MOVE_IDS_BY_SPECIES } from '../data/learnableAttackMoves';
 import { POKEMON_ABILITY_NAMES_BY_SPECIES } from '../data/pokemonAbilities';
 import type { StatKey, SpeciesOption, MoveOption, MoveCategory, MoveMultiHitOption, NatureStatKey } from './types';
@@ -174,13 +175,11 @@ const RAW_POKEMON_OPTIONS: SpeciesOption[] = ALL_SPECIES
 export const POKEMON_OPTIONS: SpeciesOption[] = disambiguateDuplicateSpeciesDisplayNames(RAW_POKEMON_OPTIONS)
   .sort(compareByDisplayName);
 
+const championsAttackMoveIds = new Set<string>(CHAMPIONS_ATTACK_MOVE_IDS);
+
 export const MOVE_OPTIONS: MoveOption[] = Array.from(GEN.moves)
   .map((move) => move as CalcMove)
-  .filter(
-    (move) =>
-      (move.category === 'Physical' || move.category === 'Special') &&
-      (move.basePower ?? 0) > 0,
-  )
+  .filter((move) => championsAttackMoveIds.has(move.id || toID(move.name)))
   .map((move) => ({
     id: move.id || toID(move.name),
     name: move.name,

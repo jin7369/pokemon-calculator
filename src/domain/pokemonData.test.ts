@@ -71,6 +71,21 @@ describe('pokemon Korean display names', () => {
     expect(getLearnableAttackMoveOptionsForSpecies('Caterpie')).toEqual([]);
   });
 
+  it('uses interpreted current learnsets for regional forms and evolutions', () => {
+    const alolanNinetalesMoves = getLearnableAttackMoveOptionsForSpecies('Ninetales-Alola').map((move) => move.name);
+    const hisuianSamurottMoves = getLearnableAttackMoveOptionsForSpecies('Samurott-Hisui').map((move) => move.name);
+
+    expect(alolanNinetalesMoves).toContain('Blizzard');
+    expect(alolanNinetalesMoves).not.toContain('Flamethrower');
+    expect(hisuianSamurottMoves).toContain('Ceaseless Edge');
+  });
+
+  it('excludes nonstandard damaging moves from Pokemon Champions move options', () => {
+    expect(getMoveOption('Hidden Power')).toBeNull();
+    expect(getMoveOption('Breakneck Blitz')).toBeNull();
+    expect(getLearnableAttackMoveOptionsForSpecies('Charizard').map((move) => move.name)).not.toContain('Hidden Power');
+  });
+
   it('returns ruleset species that can learn a selected attacking move', () => {
     const flamethrowerLearners = getSpeciesOptionsThatLearnMove('Flamethrower').map((species) => species.name);
 

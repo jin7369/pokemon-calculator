@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "verify:champions-roster": "node scripts/verifyChampionsRoster.mjs",
+    "verify:champions-moves": "node scripts/verifyChampionsMoves.mjs",
     "generate:korean-names": "node scripts/generateKoreanPokemonNames.mjs",
     "generate:move-names": "node scripts/generateKoreanMoveNames.mjs",
     "generate:abilities": "node scripts/generatePokemonAbilities.mjs",

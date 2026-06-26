@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Pokemon calculator app icon">
+  <rect width="512" height="512" rx="96" fill="#17212f"/>
+  <path d="M96 116h320v280H96z" fill="#ffffff"/>
+  <path d="M128 148h256v80H128z" fill="#edf6f8"/>
+  <path d="M128 260h56v44h-56zM208 260h56v44h-56zM288 260h56v44h-56zM128 328h56v44h-56zM208 328h56v44h-56zM288 328h56v44h-56z" fill="#1f7a8c"/>
+  <path d="M366 260h18v112h-18zM319 307h112v18H319z" fill="#c2410c"/>
+  <text x="256" y="204" text-anchor="middle" font-family="Arial, sans-serif" font-size="64" font-weight="800" fill="#17212f">PC</text>
+</svg>

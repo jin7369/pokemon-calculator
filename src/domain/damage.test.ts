@@ -1,7 +1,7 @@
 ﻿import { describe, expect, it } from 'vitest';
-import { calculateAttackResults, applyDirectMultiplier, classifyDamage } from './damage';
-import { getSpeciesOption } from './pokemonData';
-import type { AttackConfig, DefenderBulkConfig } from './types';
+import { calculateAttackResults, calculateDefenseResults, applyDirectMultiplier, classifyDamage } from './damage';
+import { getSpeciesOption, getSpeciesOptionsThatLearnMove } from './pokemonData';
+import type { AttackConfig, DefenseConfig, DefenderBulkConfig } from './types';
 
 const neutralBulk: DefenderBulkConfig = {
   nature: 'Serious',
@@ -161,5 +161,29 @@ describe('damage helpers', () => {
 
     expect(disabled.maxDamage).toBeGreaterThan(0);
     expect(enabled.maxDamage).toBeGreaterThan(disabled.maxDamage);
+  });
+
+  it('calculates incoming damage from species that can learn the selected move', () => {
+    const flamethrowerLearners = getSpeciesOptionsThatLearnMove('Flamethrower');
+    const defense: DefenseConfig = {
+      defender: 'Pikachu',
+      move: 'Flamethrower',
+      nature: 'Serious',
+      statPoints: { hp: 0, def: 0, spd: 0 },
+      attackerNature: 'Modest',
+      attackerStatPoints: { atk: 0, spa: 31 },
+      attackerBoostStage: 0,
+      attackerItem: 'none',
+      attackerDirectMultiplier: 1,
+      hitCount: 'auto',
+    };
+
+    const { results, summary } = calculateDefenseResults(defense, flamethrowerLearners);
+    const charizardResult = results.find((result) => result.name === 'Charizard');
+
+    expect(results.length).toBeGreaterThan(0);
+    expect(summary.total).toBe(results.length);
+    expect(charizardResult?.maxDamage).toBeGreaterThan(0);
+    expect(results.some((result) => result.name === 'Pikachu')).toBe(false);
   });
 });

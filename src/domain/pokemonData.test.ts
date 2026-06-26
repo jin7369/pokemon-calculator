@@ -5,6 +5,7 @@ import {
   getMoveOption,
   getLearnableAttackMoveOptionsForSpecies,
   getSpeciesOption,
+  getSpeciesOptionsThatLearnMove,
   MOVE_OPTIONS,
   NATURE_OPTIONS,
   natureModifiersForName,
@@ -68,6 +69,14 @@ describe('pokemon Korean display names', () => {
     expect(getLearnableAttackMoveOptionsForSpecies('Charizard').some((move) => move.name === 'Flamethrower')).toBe(true);
     expect(getLearnableAttackMoveOptionsForSpecies('Gholdengo').some((move) => move.name === 'Thunderbolt')).toBe(true);
     expect(getLearnableAttackMoveOptionsForSpecies('Caterpie')).toEqual([]);
+  });
+
+  it('returns ruleset species that can learn a selected attacking move', () => {
+    const flamethrowerLearners = getSpeciesOptionsThatLearnMove('Flamethrower').map((species) => species.name);
+
+    expect(flamethrowerLearners).toContain('Charizard');
+    expect(flamethrowerLearners).not.toContain('Pikachu');
+    expect(getSpeciesOptionsThatLearnMove('Splash')).toEqual([]);
   });
 
   it('stores multi-hit metadata on attacking moves', () => {

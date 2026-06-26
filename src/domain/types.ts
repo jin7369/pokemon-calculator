@@ -52,6 +52,19 @@ export interface AttackConfig {
   directMultiplier: number;
 }
 
+export interface DefenseConfig {
+  defender: string;
+  move: string;
+  nature: string;
+  statPoints: Pick<StatPointSpread, 'hp' | 'def' | 'spd'>;
+  attackerNature: string;
+  attackerStatPoints: Pick<StatPointSpread, 'atk' | 'spa'>;
+  attackerBoostStage: number;
+  attackerItem: string;
+  attackerDirectMultiplier: number;
+  hitCount: HitCountSetting;
+}
+
 export interface DefenderBulkConfig {
   nature: string;
   statPoints: Pick<StatPointSpread, 'hp' | 'def' | 'spd'>;

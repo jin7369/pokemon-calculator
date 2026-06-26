@@ -8,6 +8,7 @@ import {
   STAT_LABELS,
   STAT_KEYS,
   type AttackConfig,
+  type DefenseConfig,
   type DefenderBulkConfig,
   type HitCountSetting,
   type MoveOption,
@@ -18,18 +19,22 @@ import {
   type SurvivalCategory,
 } from './domain/types';
 import {
+  MOVE_OPTIONS,
   POKEMON_OPTIONS,
   POKEMON_RULESET,
   getLearnableAttackMoveOptionsForSpecies,
   getMoveOption,
   getSpeciesOption,
+  getSpeciesOptionsThatLearnMove,
   natureModifiersForName,
   natureNameForModifiers,
   resolveMoveName,
   resolveSpeciesName,
 } from './domain/pokemonData';
 import {
+  calculateDefenseResults,
   calculateAttackResults,
+  defensiveStatForCategory,
   offensiveStatForCategory,
   sortResults,
 } from './domain/damage';
@@ -83,6 +88,19 @@ const INITIAL_ATTACK: AttackConfig = {
 const INITIAL_DEFENDER_BULK: DefenderBulkConfig = {
   nature: 'Serious',
   statPoints: { hp: 0, def: 0, spd: 0 },
+};
+
+const INITIAL_DEFENSE: DefenseConfig = {
+  defender: '리자몽',
+  move: '화염방사',
+  nature: 'Serious',
+  statPoints: { hp: 0, def: 0, spd: 0 },
+  attackerNature: 'Modest',
+  attackerStatPoints: { atk: 0, spa: 31 },
+  attackerBoostStage: 0,
+  attackerItem: NO_OFFENSE_ITEM_ID,
+  attackerDirectMultiplier: 1,
+  hitCount: 'auto',
 };
 
 const INITIAL_FILTERS: FilterState = {
@@ -628,15 +646,22 @@ function EmptyPanel({ title }: { title: string }) {
 function App() {
   const [activeTab, setActiveTab] = useState<TabKey>('attack');
   const [attack, setAttack] = useState<AttackConfig>(INITIAL_ATTACK);
+  const [defense, setDefense] = useState<DefenseConfig>(INITIAL_DEFENSE);
   const [defenderBulk, setDefenderBulk] = useState<DefenderBulkConfig>(INITIAL_DEFENDER_BULK);
   const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS);
   const [targetSearch, setTargetSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('maxPercentDesc');
   const [targetPage, setTargetPage] = useState(0);
+  const [defenseFilters, setDefenseFilters] = useState<FilterState>(INITIAL_FILTERS);
+  const [defenseSearch, setDefenseSearch] = useState('');
+  const [defenseSortKey, setDefenseSortKey] = useState<SortKey>('maxPercentDesc');
+  const [defensePage, setDefensePage] = useState(0);
 
   const debouncedAttack = useDebouncedValue(attack, INPUT_DEBOUNCE_MS);
+  const debouncedDefense = useDebouncedValue(defense, INPUT_DEBOUNCE_MS);
   const debouncedDefenderBulk = useDebouncedValue(defenderBulk, INPUT_DEBOUNCE_MS);
   const debouncedTargetSearch = useDebouncedValue(targetSearch, SEARCH_DEBOUNCE_MS);
+  const debouncedDefenseSearch = useDebouncedValue(defenseSearch, SEARCH_DEBOUNCE_MS);
 
   const selectedAttacker = resolveSpeciesName(attack.attacker);
   const selectedAttackerOption = selectedAttacker ? getSpeciesOption(selectedAttacker) : null;
@@ -654,6 +679,29 @@ function App() {
   const itemMultiplier = offenseItemMultiplierForMove(attack.item, selectedLearnableMove);
   const finalAttackMultiplier = combinedAttackMultiplier(attack.item, selectedLearnableMove, attack.directMultiplier);
   const activeAttackStat = selectedLearnableMove ? offensiveStatForCategory(selectedLearnableMove.category) : 'spa';
+
+  const selectedDefenseDefender = resolveSpeciesName(defense.defender);
+  const selectedDefenseDefenderOption = selectedDefenseDefender ? getSpeciesOption(selectedDefenseDefender) : null;
+  const selectedDefenseMoveName = resolveMoveName(defense.move);
+  const selectedDefenseMove = selectedDefenseMoveName ? getMoveOption(selectedDefenseMoveName) : null;
+  const selectedDefenseHitCount = resolveAttackHitCount(
+    {
+      ability: '',
+      abilityEnabled: false,
+      hitCount: defense.hitCount,
+      item: defense.attackerItem,
+    },
+    selectedDefenseMove,
+  );
+  const selectedDefenseItem = getOffenseItemOption(defense.attackerItem);
+  const defenseItemMultiplier = offenseItemMultiplierForMove(defense.attackerItem, selectedDefenseMove);
+  const finalDefenseAttackMultiplier = combinedAttackMultiplier(
+    defense.attackerItem,
+    selectedDefenseMove,
+    defense.attackerDirectMultiplier,
+  );
+  const activeDefenseAttackStat = selectedDefenseMove ? offensiveStatForCategory(selectedDefenseMove.category) : 'spa';
+  const activeDefenseBulkStat = selectedDefenseMove ? defensiveStatForCategory(selectedDefenseMove.category) : 'spd';
 
   useEffect(() => {
     if (!selectedAttacker || selectedAttackerMoveOptions.length === 0) return;
@@ -687,6 +735,13 @@ function App() {
     setAttack((current) => ({ ...current, hitCount: 'auto' }));
   }, [attack.hitCount, selectedLearnableMove]);
 
+  useEffect(() => {
+    if (defense.hitCount === 'auto') return;
+    if (selectedDefenseMove?.multiHit?.selectableHits.includes(defense.hitCount)) return;
+
+    setDefense((current) => ({ ...current, hitCount: 'auto' }));
+  }, [defense.hitCount, selectedDefenseMove]);
+
   const calculationAttack = useMemo<AttackConfig | null>(() => {
     const calculationAttacker = resolveSpeciesName(debouncedAttack.attacker);
     const calculationMove = resolveMoveName(debouncedAttack.move);
@@ -709,6 +764,29 @@ function App() {
     return calculateAttackResults(calculationAttack, debouncedDefenderBulk);
   }, [calculationAttack, debouncedDefenderBulk]);
 
+  const calculationDefense = useMemo<DefenseConfig | null>(() => {
+    const calculationDefender = resolveSpeciesName(debouncedDefense.defender);
+    const calculationMove = resolveMoveName(debouncedDefense.move);
+
+    if (!calculationDefender || !calculationMove) return null;
+
+    return {
+      ...debouncedDefense,
+      defender: calculationDefender,
+      move: calculationMove,
+    };
+  }, [debouncedDefense]);
+
+  const calculationDefenseAttackers = useMemo(
+    () => getSpeciesOptionsThatLearnMove(calculationDefense?.move ?? null),
+    [calculationDefense?.move],
+  );
+
+  const defenseCalculation = useMemo(() => {
+    if (!calculationDefense) return { results: [], summary: { survives: 0, roll: 0, ko: 0, total: 0 } };
+    return calculateDefenseResults(calculationDefense, calculationDefenseAttackers);
+  }, [calculationDefense, calculationDefenseAttackers]);
+
   const filteredResults = useMemo(() => {
     const query = debouncedTargetSearch.trim().toLowerCase();
     const visible = calculation.results.filter((result) => {
@@ -720,9 +798,24 @@ function App() {
     return sortResults(visible, sortKey);
   }, [calculation.results, filters, sortKey, debouncedTargetSearch]);
 
+  const filteredDefenseResults = useMemo(() => {
+    const query = debouncedDefenseSearch.trim().toLowerCase();
+    const visible = defenseCalculation.results.filter((result) => {
+      const matchesCategory = defenseFilters[result.category];
+      const matchesQuery = query.length === 0 || (result.displayName ?? result.name).toLowerCase().includes(query) || result.name.toLowerCase().includes(query);
+      return matchesCategory && matchesQuery;
+    });
+
+    return sortResults(visible, defenseSortKey);
+  }, [defenseCalculation.results, defenseFilters, defenseSortKey, debouncedDefenseSearch]);
+
   useEffect(() => {
     setTargetPage(0);
   }, [calculation.results, filters, sortKey, debouncedTargetSearch]);
+
+  useEffect(() => {
+    setDefensePage(0);
+  }, [defenseCalculation.results, defenseFilters, defenseSortKey, debouncedDefenseSearch]);
 
   const targetPageCount = Math.max(1, Math.ceil(filteredResults.length / TARGET_RESULTS_PAGE_SIZE));
   const safeTargetPage = Math.min(targetPage, targetPageCount - 1);
@@ -734,10 +827,24 @@ function App() {
   const targetDisplayStart = filteredResults.length > 0 ? targetPageStart + 1 : 0;
   const targetDisplayEnd = targetPageStart + visibleResults.length;
 
+  const defensePageCount = Math.max(1, Math.ceil(filteredDefenseResults.length / TARGET_RESULTS_PAGE_SIZE));
+  const safeDefensePage = Math.min(defensePage, defensePageCount - 1);
+  const defensePageStart = safeDefensePage * TARGET_RESULTS_PAGE_SIZE;
+  const visibleDefenseResults = useMemo(
+    () => filteredDefenseResults.slice(defensePageStart, defensePageStart + TARGET_RESULTS_PAGE_SIZE),
+    [filteredDefenseResults, defensePageStart],
+  );
+  const defenseDisplayStart = filteredDefenseResults.length > 0 ? defensePageStart + 1 : 0;
+  const defenseDisplayEnd = defensePageStart + visibleDefenseResults.length;
+
   const attackPointSpread = toFullSpread(attack.attackStatPoints);
   const defensePointSpread = toFullSpread(defenderBulk.statPoints);
+  const defenseCalculatorPointSpread = toFullSpread(defense.statPoints);
+  const defenseAttackerPointSpread = toFullSpread(defense.attackerStatPoints);
   const attackPointTotal = totalStatPoints(attackPointSpread);
   const defensePointTotal = totalStatPoints(defensePointSpread);
+  const defenseCalculatorPointTotal = totalStatPoints(defenseCalculatorPointSpread);
+  const defenseAttackerPointTotal = totalStatPoints(defenseAttackerPointSpread);
 
   function setAttackStatPoint(stat: 'atk' | 'spa', value: number) {
     setAttack((current) => {
@@ -755,6 +862,26 @@ function App() {
       return {
         ...current,
         statPoints: { hp: next.hp, def: next.def, spd: next.spd },
+      };
+    });
+  }
+
+  function setDefenseStatPoint(stat: 'hp' | 'def' | 'spd', value: number) {
+    setDefense((current) => {
+      const next = updateStatPoint(toFullSpread(current.statPoints), stat, value);
+      return {
+        ...current,
+        statPoints: { hp: next.hp, def: next.def, spd: next.spd },
+      };
+    });
+  }
+
+  function setDefenseAttackerStatPoint(stat: 'atk' | 'spa', value: number) {
+    setDefense((current) => {
+      const next = updateStatPoint(toFullSpread(current.attackerStatPoints), stat, value);
+      return {
+        ...current,
+        attackerStatPoints: { atk: next.atk, spa: next.spa },
       };
     });
   }
@@ -1123,7 +1250,315 @@ function App() {
           </section>
         </section>
       ) : activeTab === 'defense' ? (
-        <EmptyPanel title="수비 계산" />
+        <section className="workspace" aria-label="수비 계산기">
+          <aside className="control-panel">
+            <section className="control-section">
+              <div className="section-title">
+                <Shield size={18} aria-hidden="true" />
+                <h2>방어 설정</h2>
+              </div>
+
+              <PokemonPicker
+                label="피격 포켓몬"
+                value={defense.defender}
+                selected={selectedDefenseDefenderOption}
+                options={POKEMON_OPTIONS}
+                onChange={(value) => setDefense((current) => ({ ...current, defender: value }))}
+              />
+
+              <BaseStatsTable species={selectedDefenseDefenderOption} />
+
+              <MovePicker
+                label="받을 기술"
+                value={defense.move}
+                selected={selectedDefenseMove}
+                options={MOVE_OPTIONS}
+                onChange={(value) => setDefense((current) => ({ ...current, move: value }))}
+              />
+
+              {selectedDefenseMove ? (
+                <div className="move-summary">
+                  <TypeBadge type={selectedDefenseMove.type} />
+                  <span>{selectedDefenseMove.category}</span>
+                  <span>위력 {selectedDefenseMove.basePower}</span>
+                  {selectedDefenseHitCount ? <span>{selectedDefenseHitCount.hits}히트</span> : null}
+                </div>
+              ) : null}
+
+              {selectedDefenseMove?.multiHit && selectedDefenseHitCount ? (
+                <div className="multi-hit-panel">
+                  <div className="multi-hit-panel__header">
+                    <span>다단히트</span>
+                    <strong>{selectedDefenseHitCount.hits}히트</strong>
+                  </div>
+
+                  {selectedDefenseMove.multiHit.selectableHits.length > 1 ? (
+                    <label className="field-label">
+                      <span>히트 수</span>
+                      <select
+                        value={String(defense.hitCount)}
+                        onChange={(event) => setDefense((current) => ({
+                          ...current,
+                          hitCount: parseHitCountSetting(event.target.value),
+                        }))}
+                      >
+                        <option value="auto">
+                          자동 ({formatHitCountOption(resolveAttackHitCount(
+                            {
+                              ability: '',
+                              abilityEnabled: false,
+                              hitCount: 'auto',
+                              item: defense.attackerItem,
+                            },
+                            selectedDefenseMove,
+                          )?.hits ?? selectedDefenseMove.multiHit.defaultHits)})
+                        </option>
+                        {selectedDefenseMove.multiHit.selectableHits.map((hits) => (
+                          <option key={hits} value={hits}>{formatHitCountOption(hits)}</option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
+
+                  <small>
+                    {describeHitCountSource(selectedDefenseHitCount.source)}
+                    {selectedDefenseMove.multiHit.supportsLoadedDice ? ' · 속임수주사위 자동 4히트' : ''}
+                  </small>
+                </div>
+              ) : null}
+
+              <NatureModifierPicker
+                label="피격 성격"
+                value={defense.nature}
+                onChange={(value) => setDefense((current) => ({ ...current, nature: value }))}
+              />
+
+              <div className="stat-block">
+                <div className="stat-block__header">
+                  <span>내구 Stat Points</span>
+                  <strong>{STAT_LABELS[activeDefenseBulkStat]} 적용</strong>
+                </div>
+                <StatPointControl
+                  stat="hp"
+                  value={defense.statPoints.hp}
+                  total={defenseCalculatorPointTotal}
+                  onChange={(value) => setDefenseStatPoint('hp', value)}
+                />
+                <StatPointControl
+                  stat="def"
+                  value={defense.statPoints.def}
+                  total={defenseCalculatorPointTotal}
+                  onChange={(value) => setDefenseStatPoint('def', value)}
+                />
+                <StatPointControl
+                  stat="spd"
+                  value={defense.statPoints.spd}
+                  total={defenseCalculatorPointTotal}
+                  onChange={(value) => setDefenseStatPoint('spd', value)}
+                />
+              </div>
+            </section>
+
+            <section className="control-section">
+              <div className="section-title">
+                <Swords size={18} aria-hidden="true" />
+                <h2>공통 공격 조건</h2>
+              </div>
+
+              <NatureModifierPicker
+                label="공격자 성격"
+                value={defense.attackerNature}
+                onChange={(value) => setDefense((current) => ({ ...current, attackerNature: value }))}
+              />
+
+              <div className="stat-block">
+                <div className="stat-block__header">
+                  <span>공격자 Stat Points</span>
+                  <strong>{STAT_LABELS[activeDefenseAttackStat]} 적용</strong>
+                </div>
+                <StatPointControl
+                  stat="atk"
+                  value={defense.attackerStatPoints.atk}
+                  total={defenseAttackerPointTotal}
+                  onChange={(value) => setDefenseAttackerStatPoint('atk', value)}
+                />
+                <StatPointControl
+                  stat="spa"
+                  value={defense.attackerStatPoints.spa}
+                  total={defenseAttackerPointTotal}
+                  onChange={(value) => setDefenseAttackerStatPoint('spa', value)}
+                />
+              </div>
+
+              <label className="field-label">
+                <span>공격 아이템</span>
+                <select
+                  value={defense.attackerItem}
+                  onChange={(event) => setDefense((current) => ({ ...current, attackerItem: event.target.value }))}
+                >
+                  {OFFENSE_ITEM_OPTIONS.map((item) => (
+                    <option key={item.id} value={item.id}>{item.label}</option>
+                  ))}
+                </select>
+              </label>
+
+              <div className="multiplier-summary">
+                <span>아이템 {formatMultiplier(defenseItemMultiplier)}</span>
+                <span>직접 {formatMultiplier(defense.attackerDirectMultiplier)}</span>
+                <strong>최종 {formatMultiplier(finalDefenseAttackMultiplier)}</strong>
+                <small>{selectedDefenseItem.label}</small>
+              </div>
+
+              <div className="inline-fields">
+                <label className="field-label">
+                  <span>능력 랭크</span>
+                  <select
+                    value={defense.attackerBoostStage}
+                    onChange={(event) => setDefense((current) => ({ ...current, attackerBoostStage: Number(event.target.value) }))}
+                  >
+                    {BOOST_STAGES.map((stage) => (
+                      <option key={stage} value={stage}>{formatBoost(stage)}</option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="field-label">
+                  <span>직접 배율</span>
+                  <select
+                    value={defense.attackerDirectMultiplier}
+                    onChange={(event) => setDefense((current) => ({ ...current, attackerDirectMultiplier: Number(event.target.value) }))}
+                  >
+                    {DIRECT_MULTIPLIERS.map((multiplier) => (
+                      <option key={multiplier} value={multiplier}>{multiplier}x</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </section>
+          </aside>
+
+          <section className="results-panel">
+            <div className="results-header">
+              <div>
+                <p className="eyebrow">Incoming Damage</p>
+                <h2>기술 습득 공격자 계산</h2>
+              </div>
+              <div className="result-count">
+                {defenseDisplayStart}-{defenseDisplayEnd}/{filteredDefenseResults.length} 표시
+              </div>
+            </div>
+
+            {!selectedDefenseDefender || !selectedDefenseMove ? (
+              <div className="invalid-state">피격 포켓몬 또는 받을 기술을 확인하세요.</div>
+            ) : (
+              <>
+                <div className="summary-grid">
+                  {CATEGORY_ORDER.map((category) => (
+                    <button
+                      key={category}
+                      type="button"
+                      className={`summary-tile summary-tile--${category} ${defenseFilters[category] ? 'summary-tile--active' : ''}`}
+                      onClick={() => setDefenseFilters((current) => ({ ...current, [category]: !current[category] }))}
+                    >
+                      <span>{CATEGORY_LABELS[category]}</span>
+                      <strong>{defenseCalculation.summary[category].toLocaleString()}</strong>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="table-toolbar">
+                  <label className="search-box">
+                    <Search size={17} aria-hidden="true" />
+                    <input
+                      value={defenseSearch}
+                      onChange={(event) => setDefenseSearch(event.target.value)}
+                      placeholder="공격자 검색"
+                    />
+                  </label>
+                  <label className="sort-box">
+                    <SlidersHorizontal size={17} aria-hidden="true" />
+                    <select value={defenseSortKey} onChange={(event) => setDefenseSortKey(event.target.value as SortKey)}>
+                      <option value="maxPercentDesc">최대 데미지 높은순</option>
+                      <option value="maxPercentAsc">최대 데미지 낮은순</option>
+                      <option value="nameAsc">한글 이름순</option>
+                      <option value="hpDesc">HP 높은순</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div className="results-page-meta">
+                  <span>{filteredDefenseResults.length.toLocaleString()}개 결과</span>
+                  <span>{defenseDisplayStart}-{defenseDisplayEnd} 표시</span>
+                </div>
+
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>공격자</th>
+                        <th>타입</th>
+                        <th>내 HP</th>
+                        <th>데미지</th>
+                        <th>비율</th>
+                        <th>판정</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {visibleDefenseResults.length > 0 ? (
+                        visibleDefenseResults.map((result) => (
+                          <tr key={result.id}>
+                            <td className="pokemon-cell"><span>{result.displayName ?? result.name}</span><small>{result.name}</small></td>
+                            <td>
+                              <div className="type-list">
+                                {result.types.map((type) => <TypeBadge key={type} type={type} />)}
+                              </div>
+                            </td>
+                            <td>{result.hp}</td>
+                            <td>{result.minDamage}-{result.maxDamage}</td>
+                            <td>{formatPercent(result.minPercent)} - {formatPercent(result.maxPercent)}</td>
+                            <td>
+                              <span className={`verdict verdict--${result.category}`}>
+                                {CATEGORY_LABELS[result.category]}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td className="results-empty-row" colSpan={6}>해당 기술을 배우는 공격자 없음</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {filteredDefenseResults.length > 0 ? (
+                  <div className="results-pagination">
+                    <button
+                      type="button"
+                      aria-label="이전 수비 결과 페이지"
+                      disabled={safeDefensePage === 0}
+                      onClick={() => setDefensePage((current) => Math.max(current - 1, 0))}
+                    >
+                      <ChevronLeft size={17} aria-hidden="true" />
+                      이전
+                    </button>
+                    <span>{safeDefensePage + 1}/{defensePageCount}</span>
+                    <button
+                      type="button"
+                      aria-label="다음 수비 결과 페이지"
+                      disabled={safeDefensePage >= defensePageCount - 1}
+                      onClick={() => setDefensePage((current) => Math.min(current + 1, defensePageCount - 1))}
+                    >
+                      다음
+                      <ChevronRight size={17} aria-hidden="true" />
+                    </button>
+                  </div>
+                ) : null}
+              </>
+            )}
+          </section>
+        </section>
       ) : (
         <EmptyPanel title="스피드 계산" />
       )}

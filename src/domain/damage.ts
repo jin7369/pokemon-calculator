@@ -4,6 +4,7 @@ import type {
   AttackConfig,
   DamageResult,
   DamageSummary,
+  DefenseConfig,
   DefenderBulkConfig,
   MoveCategory,
   SortKey,
@@ -11,7 +12,7 @@ import type {
   StatKey,
   SurvivalCategory,
 } from './types';
-import { BATTLE_LEVEL, GEN, getMoveOption, POKEMON_OPTIONS } from './pokemonData';
+import { BATTLE_LEVEL, GEN, getMoveOption, getSpeciesOption, POKEMON_OPTIONS } from './pokemonData';
 import { combinedAttackMultiplier } from './offenseItems';
 import { resolveAttackHitCount } from './multiHit';
 import { statPointsToEvs } from './statPoints';
@@ -136,6 +137,81 @@ export function calculateAttackResults(
         name: target.name,
         displayName: target.displayName ?? target.name,
         types: target.types,
+        hp,
+        minDamage,
+        maxDamage,
+        minPercent,
+        maxPercent,
+        category: classifyDamage(minDamage, maxDamage, hp),
+      });
+    } catch {
+      // Some legacy or special forms in the data set can be incompatible with a move calculation.
+    }
+  }
+
+  return { results, summary: summarizeResults(results) };
+}
+
+export function calculateDefenseResults(
+  defense: DefenseConfig,
+  attackers: SpeciesOption[],
+): { results: DamageResult[]; summary: DamageSummary } {
+  const moveOption = getMoveOption(defense.move);
+  const defenderOption = getSpeciesOption(defense.defender);
+  if (!moveOption || !defenderOption) return { results: [], summary: summarizeResults([]) };
+
+  const offensiveStat = offensiveStatForCategory(moveOption.category);
+  const finalMultiplier = combinedAttackMultiplier(
+    defense.attackerItem,
+    moveOption,
+    defense.attackerDirectMultiplier,
+  );
+  const resolvedHitCount = resolveAttackHitCount(
+    {
+      ability: NO_ABILITY,
+      abilityEnabled: false,
+      hitCount: defense.hitCount,
+      item: defense.attackerItem,
+    },
+    moveOption,
+  );
+  const attackerEvs = statPointsToEvs({
+    [offensiveStat]: defense.attackerStatPoints[offensiveStat],
+  });
+  const defenderEvs = statPointsToEvs(defense.statPoints);
+  const move = new Move(GEN, moveOption.name, {
+    ability: NO_ABILITY,
+    hits: resolvedHitCount?.hits,
+  });
+  const defender = new Pokemon(GEN, defenderOption.name, {
+    level: BATTLE_LEVEL,
+    ability: NO_ABILITY,
+    nature: defense.nature,
+    evs: defenderEvs,
+  });
+  const hp = defender.maxHP();
+
+  const results: DamageResult[] = [];
+
+  for (const attackerOption of attackers) {
+    try {
+      const attacker = new Pokemon(GEN, attackerOption.name, {
+        level: BATTLE_LEVEL,
+        ability: NO_ABILITY,
+        nature: defense.attackerNature,
+        evs: attackerEvs,
+        boosts: buildBoosts(offensiveStat, defense.attackerBoostStage),
+      });
+      const rawRange = calculate(GEN, attacker, defender, move).range();
+      const [minDamage, maxDamage] = applyDirectMultiplier(rawRange, finalMultiplier);
+      const minPercent = hp > 0 ? (minDamage / hp) * 100 : 0;
+      const maxPercent = hp > 0 ? (maxDamage / hp) * 100 : 0;
+
+      results.push({
+        id: attackerOption.id,
+        name: attackerOption.name,
+        displayName: attackerOption.displayName ?? attackerOption.name,
+        types: attackerOption.types,
         hp,
         minDamage,
         maxDamage,

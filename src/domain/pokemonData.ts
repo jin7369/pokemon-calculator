@@ -300,3 +300,20 @@ export function getLearnableAttackMoveOptionsForSpecies(name: string | null): Mo
     .sort(compareByDisplayName);
 }
 
+export function getSpeciesOptionsThatLearnMove(name: string | null): SpeciesOption[] {
+  if (!name) return [];
+
+  const move = getMoveOption(name);
+  if (!move) return [];
+
+  return POKEMON_OPTIONS
+    .filter((species) => {
+      const moveIds = LEARNABLE_ATTACK_MOVE_IDS_BY_SPECIES[
+        species.name as keyof typeof LEARNABLE_ATTACK_MOVE_IDS_BY_SPECIES
+      ] ?? [];
+
+      return (moveIds as readonly string[]).includes(move.id);
+    })
+    .sort(compareByDisplayName);
+}
+

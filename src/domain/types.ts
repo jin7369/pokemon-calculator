@@ -6,6 +6,8 @@ export type NatureStatKey = CombatStatKey;
 export type MoveCategory = 'Physical' | 'Special';
 export type SortKey = 'maxPercentDesc' | 'maxPercentAsc' | 'nameAsc' | 'hpDesc';
 export type SurvivalCategory = 'survives' | 'roll' | 'ko';
+export type SpeedSortKey = 'marginDesc' | 'targetSpeedDesc' | 'targetSpeedAsc' | 'nameAsc';
+export type SpeedCategory = 'outspeeds' | 'tie' | 'slower';
 export type HitCountSetting = 'auto' | number;
 
 export type StatPointSpread = Record<StatKey, number>;
@@ -65,6 +67,20 @@ export interface DefenseConfig {
   hitCount: HitCountSetting;
 }
 
+export interface SpeedConfig {
+  pokemon: string;
+  nature: string;
+  statPoints: Pick<StatPointSpread, 'spe'>;
+  boostStage: number;
+  item: string;
+  directMultiplier: number;
+  targetNature: string;
+  targetStatPoints: Pick<StatPointSpread, 'spe'>;
+  targetBoostStage: number;
+  targetItem: string;
+  targetDirectMultiplier: number;
+}
+
 export interface DefenderBulkConfig {
   nature: string;
   statPoints: Pick<StatPointSpread, 'hp' | 'def' | 'spd'>;
@@ -90,6 +106,26 @@ export interface DamageSummary {
   total: number;
 }
 
+export interface SpeedResult {
+  id: string;
+  name: string;
+  displayName: string;
+  types: string[];
+  selfBaseSpeed: number;
+  selfFinalSpeed: number;
+  targetBaseSpeed: number;
+  targetFinalSpeed: number;
+  margin: number;
+  category: SpeedCategory;
+}
+
+export interface SpeedSummary {
+  outspeeds: number;
+  tie: number;
+  slower: number;
+  total: number;
+}
+
 export const STAT_KEYS: StatKey[] = ['hp', 'atk', 'def', 'spa', 'spd', 'spe'];
 export const NATURE_STAT_KEYS: NatureStatKey[] = ['atk', 'def', 'spa', 'spd', 'spe'];
 
@@ -106,6 +142,12 @@ export const CATEGORY_LABELS: Record<SurvivalCategory, string> = {
   survives: '확정 생존',
   roll: '난수',
   ko: '확정 KO',
+};
+
+export const SPEED_CATEGORY_LABELS: Record<SpeedCategory, string> = {
+  outspeeds: '추월',
+  tie: '동속',
+  slower: '추월당함',
 };
 
 export const EMPTY_SPREAD: StatPointSpread = {

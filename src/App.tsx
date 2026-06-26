@@ -5,6 +5,7 @@ import {
   CATEGORY_LABELS,
   EMPTY_SPREAD,
   NATURE_STAT_KEYS,
+  SPEED_CATEGORY_LABELS,
   STAT_LABELS,
   STAT_KEYS,
   type AttackConfig,
@@ -13,6 +14,9 @@ import {
   type HitCountSetting,
   type MoveOption,
   type NatureStatKey,
+  type SpeedCategory,
+  type SpeedConfig,
+  type SpeedSortKey,
   type SpeciesOption,
   type SortKey,
   type StatKey,
@@ -53,6 +57,15 @@ import {
   offenseItemMultiplierForMove,
 } from './domain/offenseItems';
 import {
+  NO_SPEED_ITEM_ID,
+  SPEED_ITEM_OPTIONS,
+  getSpeedItemOption,
+} from './domain/speedItems';
+import {
+  calculateSpeedResults,
+  sortSpeedResults,
+} from './domain/speed';
+import {
   describeHitCountSource,
   formatMoveHitRange,
   resolveAttackHitCount,
@@ -61,10 +74,13 @@ import {
 type TabKey = 'attack' | 'defense' | 'speed';
 
 type FilterState = Record<SurvivalCategory, boolean>;
+type SpeedFilterState = Record<SpeedCategory, boolean>;
 
 const DIRECT_MULTIPLIERS = [0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4];
+const SPEED_DIRECT_MULTIPLIERS = [0.25, 0.5, 1, 1.5, 2, 4];
 const BOOST_STAGES = [-6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6];
 const CATEGORY_ORDER: SurvivalCategory[] = ['survives', 'roll', 'ko'];
+const SPEED_CATEGORY_ORDER: SpeedCategory[] = ['outspeeds', 'tie', 'slower'];
 const INPUT_DEBOUNCE_MS = 180;
 const SEARCH_DEBOUNCE_MS = 120;
 const POKEMON_PICKER_PAGE_SIZE = 10;
@@ -103,10 +119,30 @@ const INITIAL_DEFENSE: DefenseConfig = {
   hitCount: 'auto',
 };
 
+const INITIAL_SPEED: SpeedConfig = {
+  pokemon: '리자몽',
+  nature: 'Timid',
+  statPoints: { spe: 31 },
+  boostStage: 0,
+  item: NO_SPEED_ITEM_ID,
+  directMultiplier: 1,
+  targetNature: 'Timid',
+  targetStatPoints: { spe: 31 },
+  targetBoostStage: 0,
+  targetItem: NO_SPEED_ITEM_ID,
+  targetDirectMultiplier: 1,
+};
+
 const INITIAL_FILTERS: FilterState = {
   survives: true,
   roll: true,
   ko: true,
+};
+
+const INITIAL_SPEED_FILTERS: SpeedFilterState = {
+  outspeeds: true,
+  tie: true,
+  slower: true,
 };
 
 const TABS: Array<{ key: TabKey; label: string; icon: typeof Swords }> = [
@@ -121,6 +157,11 @@ function formatPercent(value: number): string {
 
 function formatBoost(stage: number): string {
   return stage > 0 ? `+${stage}` : `${stage}`;
+}
+
+function formatSpeedMargin(value: number): string {
+  if (value > 0) return `+${value}`;
+  return `${value}`;
 }
 
 function parseHitCountSetting(value: string): HitCountSetting {
@@ -634,19 +675,11 @@ function BaseStatsTable({ species }: { species: SpeciesOption | null }) {
   );
 }
 
-function EmptyPanel({ title }: { title: string }) {
-  return (
-    <section className="empty-panel">
-      <h2>{title}</h2>
-      <p>준비 중</p>
-    </section>
-  );
-}
-
 function App() {
   const [activeTab, setActiveTab] = useState<TabKey>('attack');
   const [attack, setAttack] = useState<AttackConfig>(INITIAL_ATTACK);
   const [defense, setDefense] = useState<DefenseConfig>(INITIAL_DEFENSE);
+  const [speed, setSpeed] = useState<SpeedConfig>(INITIAL_SPEED);
   const [defenderBulk, setDefenderBulk] = useState<DefenderBulkConfig>(INITIAL_DEFENDER_BULK);
   const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS);
   const [targetSearch, setTargetSearch] = useState('');
@@ -656,12 +689,18 @@ function App() {
   const [defenseSearch, setDefenseSearch] = useState('');
   const [defenseSortKey, setDefenseSortKey] = useState<SortKey>('maxPercentDesc');
   const [defensePage, setDefensePage] = useState(0);
+  const [speedFilters, setSpeedFilters] = useState<SpeedFilterState>(INITIAL_SPEED_FILTERS);
+  const [speedSearch, setSpeedSearch] = useState('');
+  const [speedSortKey, setSpeedSortKey] = useState<SpeedSortKey>('marginDesc');
+  const [speedPage, setSpeedPage] = useState(0);
 
   const debouncedAttack = useDebouncedValue(attack, INPUT_DEBOUNCE_MS);
   const debouncedDefense = useDebouncedValue(defense, INPUT_DEBOUNCE_MS);
+  const debouncedSpeed = useDebouncedValue(speed, INPUT_DEBOUNCE_MS);
   const debouncedDefenderBulk = useDebouncedValue(defenderBulk, INPUT_DEBOUNCE_MS);
   const debouncedTargetSearch = useDebouncedValue(targetSearch, SEARCH_DEBOUNCE_MS);
   const debouncedDefenseSearch = useDebouncedValue(defenseSearch, SEARCH_DEBOUNCE_MS);
+  const debouncedSpeedSearch = useDebouncedValue(speedSearch, SEARCH_DEBOUNCE_MS);
 
   const selectedAttacker = resolveSpeciesName(attack.attacker);
   const selectedAttackerOption = selectedAttacker ? getSpeciesOption(selectedAttacker) : null;
@@ -702,6 +741,13 @@ function App() {
   );
   const activeDefenseAttackStat = selectedDefenseMove ? offensiveStatForCategory(selectedDefenseMove.category) : 'spa';
   const activeDefenseBulkStat = selectedDefenseMove ? defensiveStatForCategory(selectedDefenseMove.category) : 'spd';
+
+  const selectedSpeedPokemon = resolveSpeciesName(speed.pokemon);
+  const selectedSpeedOption = selectedSpeedPokemon ? getSpeciesOption(selectedSpeedPokemon) : null;
+  const selectedSpeedItem = getSpeedItemOption(speed.item);
+  const selectedTargetSpeedItem = getSpeedItemOption(speed.targetItem);
+  const finalSpeedMultiplier = selectedSpeedItem.multiplier * speed.directMultiplier;
+  const finalTargetSpeedMultiplier = selectedTargetSpeedItem.multiplier * speed.targetDirectMultiplier;
 
   useEffect(() => {
     if (!selectedAttacker || selectedAttackerMoveOptions.length === 0) return;
@@ -787,6 +833,21 @@ function App() {
     return calculateDefenseResults(calculationDefense, calculationDefenseAttackers);
   }, [calculationDefense, calculationDefenseAttackers]);
 
+  const calculationSpeed = useMemo<SpeedConfig | null>(() => {
+    const calculationPokemon = resolveSpeciesName(debouncedSpeed.pokemon);
+    if (!calculationPokemon) return null;
+
+    return {
+      ...debouncedSpeed,
+      pokemon: calculationPokemon,
+    };
+  }, [debouncedSpeed]);
+
+  const speedCalculation = useMemo(() => {
+    if (!calculationSpeed) return { results: [], summary: { outspeeds: 0, tie: 0, slower: 0, total: 0 } };
+    return calculateSpeedResults(calculationSpeed);
+  }, [calculationSpeed]);
+
   const filteredResults = useMemo(() => {
     const query = debouncedTargetSearch.trim().toLowerCase();
     const visible = calculation.results.filter((result) => {
@@ -809,6 +870,17 @@ function App() {
     return sortResults(visible, defenseSortKey);
   }, [defenseCalculation.results, defenseFilters, defenseSortKey, debouncedDefenseSearch]);
 
+  const filteredSpeedResults = useMemo(() => {
+    const query = debouncedSpeedSearch.trim().toLowerCase();
+    const visible = speedCalculation.results.filter((result) => {
+      const matchesCategory = speedFilters[result.category];
+      const matchesQuery = query.length === 0 || result.displayName.toLowerCase().includes(query) || result.name.toLowerCase().includes(query);
+      return matchesCategory && matchesQuery;
+    });
+
+    return sortSpeedResults(visible, speedSortKey);
+  }, [speedCalculation.results, speedFilters, speedSortKey, debouncedSpeedSearch]);
+
   useEffect(() => {
     setTargetPage(0);
   }, [calculation.results, filters, sortKey, debouncedTargetSearch]);
@@ -816,6 +888,10 @@ function App() {
   useEffect(() => {
     setDefensePage(0);
   }, [defenseCalculation.results, defenseFilters, defenseSortKey, debouncedDefenseSearch]);
+
+  useEffect(() => {
+    setSpeedPage(0);
+  }, [speedCalculation.results, speedFilters, speedSortKey, debouncedSpeedSearch]);
 
   const targetPageCount = Math.max(1, Math.ceil(filteredResults.length / TARGET_RESULTS_PAGE_SIZE));
   const safeTargetPage = Math.min(targetPage, targetPageCount - 1);
@@ -837,14 +913,28 @@ function App() {
   const defenseDisplayStart = filteredDefenseResults.length > 0 ? defensePageStart + 1 : 0;
   const defenseDisplayEnd = defensePageStart + visibleDefenseResults.length;
 
+  const speedPageCount = Math.max(1, Math.ceil(filteredSpeedResults.length / TARGET_RESULTS_PAGE_SIZE));
+  const safeSpeedPage = Math.min(speedPage, speedPageCount - 1);
+  const speedPageStart = safeSpeedPage * TARGET_RESULTS_PAGE_SIZE;
+  const visibleSpeedResults = useMemo(
+    () => filteredSpeedResults.slice(speedPageStart, speedPageStart + TARGET_RESULTS_PAGE_SIZE),
+    [filteredSpeedResults, speedPageStart],
+  );
+  const speedDisplayStart = filteredSpeedResults.length > 0 ? speedPageStart + 1 : 0;
+  const speedDisplayEnd = speedPageStart + visibleSpeedResults.length;
+
   const attackPointSpread = toFullSpread(attack.attackStatPoints);
   const defensePointSpread = toFullSpread(defenderBulk.statPoints);
   const defenseCalculatorPointSpread = toFullSpread(defense.statPoints);
   const defenseAttackerPointSpread = toFullSpread(defense.attackerStatPoints);
+  const speedPointSpread = toFullSpread(speed.statPoints);
+  const targetSpeedPointSpread = toFullSpread(speed.targetStatPoints);
   const attackPointTotal = totalStatPoints(attackPointSpread);
   const defensePointTotal = totalStatPoints(defensePointSpread);
   const defenseCalculatorPointTotal = totalStatPoints(defenseCalculatorPointSpread);
   const defenseAttackerPointTotal = totalStatPoints(defenseAttackerPointSpread);
+  const speedPointTotal = totalStatPoints(speedPointSpread);
+  const targetSpeedPointTotal = totalStatPoints(targetSpeedPointSpread);
 
   function setAttackStatPoint(stat: 'atk' | 'spa', value: number) {
     setAttack((current) => {
@@ -882,6 +972,26 @@ function App() {
       return {
         ...current,
         attackerStatPoints: { atk: next.atk, spa: next.spa },
+      };
+    });
+  }
+
+  function setSpeedStatPoint(value: number) {
+    setSpeed((current) => {
+      const next = updateStatPoint(toFullSpread(current.statPoints), 'spe', value);
+      return {
+        ...current,
+        statPoints: { spe: next.spe },
+      };
+    });
+  }
+
+  function setTargetSpeedStatPoint(value: number) {
+    setSpeed((current) => {
+      const next = updateStatPoint(toFullSpread(current.targetStatPoints), 'spe', value);
+      return {
+        ...current,
+        targetStatPoints: { spe: next.spe },
       };
     });
   }
@@ -1560,7 +1670,283 @@ function App() {
           </section>
         </section>
       ) : (
-        <EmptyPanel title="스피드 계산" />
+        <section className="workspace" aria-label="스피드 계산기">
+          <aside className="control-panel">
+            <section className="control-section">
+              <div className="section-title">
+                <Gauge size={18} aria-hidden="true" />
+                <h2>내 스피드 설정</h2>
+              </div>
+
+              <PokemonPicker
+                label="기준 포켓몬"
+                value={speed.pokemon}
+                selected={selectedSpeedOption}
+                options={POKEMON_OPTIONS}
+                onChange={(value) => setSpeed((current) => ({ ...current, pokemon: value }))}
+              />
+
+              <BaseStatsTable species={selectedSpeedOption} />
+
+              <NatureModifierPicker
+                label="성격"
+                value={speed.nature}
+                onChange={(value) => setSpeed((current) => ({ ...current, nature: value }))}
+              />
+
+              <div className="stat-block">
+                <div className="stat-block__header">
+                  <span>스피드 Stat Points</span>
+                  <strong>{speedPointTotal}/{STAT_POINT_TOTAL_LIMIT}</strong>
+                </div>
+                <StatPointControl
+                  stat="spe"
+                  value={speed.statPoints.spe}
+                  total={speedPointTotal}
+                  onChange={setSpeedStatPoint}
+                />
+              </div>
+
+              <label className="field-label">
+                <span>스피드 도구/효과</span>
+                <select
+                  value={speed.item}
+                  onChange={(event) => setSpeed((current) => ({ ...current, item: event.target.value }))}
+                >
+                  {SPEED_ITEM_OPTIONS.map((item) => (
+                    <option key={item.id} value={item.id}>{item.label}</option>
+                  ))}
+                </select>
+              </label>
+
+              <div className="inline-fields">
+                <label className="field-label">
+                  <span>스피드 랭크</span>
+                  <select
+                    value={speed.boostStage}
+                    onChange={(event) => setSpeed((current) => ({ ...current, boostStage: Number(event.target.value) }))}
+                  >
+                    {BOOST_STAGES.map((stage) => (
+                      <option key={stage} value={stage}>{formatBoost(stage)}</option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="field-label">
+                  <span>직접 배율</span>
+                  <select
+                    value={speed.directMultiplier}
+                    onChange={(event) => setSpeed((current) => ({ ...current, directMultiplier: Number(event.target.value) }))}
+                  >
+                    {SPEED_DIRECT_MULTIPLIERS.map((multiplier) => (
+                      <option key={multiplier} value={multiplier}>{multiplier}x</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <div className="multiplier-summary">
+                <span>도구 {formatMultiplier(selectedSpeedItem.multiplier)}</span>
+                <span>직접 {formatMultiplier(speed.directMultiplier)}</span>
+                <strong>최종 {formatMultiplier(finalSpeedMultiplier)}</strong>
+                <small>{selectedSpeedItem.label}</small>
+              </div>
+            </section>
+
+            <section className="control-section">
+              <div className="section-title">
+                <SlidersHorizontal size={18} aria-hidden="true" />
+                <h2>비교 대상 공통 조건</h2>
+              </div>
+
+              <NatureModifierPicker
+                label="상대 성격"
+                value={speed.targetNature}
+                onChange={(value) => setSpeed((current) => ({ ...current, targetNature: value }))}
+              />
+
+              <div className="stat-block">
+                <div className="stat-block__header">
+                  <span>상대 스피드 Stat Points</span>
+                  <strong>{targetSpeedPointTotal}/{STAT_POINT_TOTAL_LIMIT}</strong>
+                </div>
+                <StatPointControl
+                  stat="spe"
+                  value={speed.targetStatPoints.spe}
+                  total={targetSpeedPointTotal}
+                  onChange={setTargetSpeedStatPoint}
+                />
+              </div>
+
+              <label className="field-label">
+                <span>상대 스피드 도구/효과</span>
+                <select
+                  value={speed.targetItem}
+                  onChange={(event) => setSpeed((current) => ({ ...current, targetItem: event.target.value }))}
+                >
+                  {SPEED_ITEM_OPTIONS.map((item) => (
+                    <option key={item.id} value={item.id}>{item.label}</option>
+                  ))}
+                </select>
+              </label>
+
+              <div className="inline-fields">
+                <label className="field-label">
+                  <span>상대 스피드 랭크</span>
+                  <select
+                    value={speed.targetBoostStage}
+                    onChange={(event) => setSpeed((current) => ({ ...current, targetBoostStage: Number(event.target.value) }))}
+                  >
+                    {BOOST_STAGES.map((stage) => (
+                      <option key={stage} value={stage}>{formatBoost(stage)}</option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="field-label">
+                  <span>상대 직접 배율</span>
+                  <select
+                    value={speed.targetDirectMultiplier}
+                    onChange={(event) => setSpeed((current) => ({ ...current, targetDirectMultiplier: Number(event.target.value) }))}
+                  >
+                    {SPEED_DIRECT_MULTIPLIERS.map((multiplier) => (
+                      <option key={multiplier} value={multiplier}>{multiplier}x</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <div className="multiplier-summary">
+                <span>도구 {formatMultiplier(selectedTargetSpeedItem.multiplier)}</span>
+                <span>직접 {formatMultiplier(speed.targetDirectMultiplier)}</span>
+                <strong>최종 {formatMultiplier(finalTargetSpeedMultiplier)}</strong>
+                <small>{selectedTargetSpeedItem.label}</small>
+              </div>
+            </section>
+          </aside>
+
+          <section className="results-panel">
+            <div className="results-header">
+              <div>
+                <p className="eyebrow">Speed Results</p>
+                <h2>전체 대상 추월 판정</h2>
+              </div>
+              <div className="result-count">
+                {speedDisplayStart}-{speedDisplayEnd}/{filteredSpeedResults.length} 표시
+              </div>
+            </div>
+
+            {!selectedSpeedOption ? (
+              <div className="invalid-state">기준 포켓몬 이름을 확인하세요.</div>
+            ) : (
+              <>
+                <div className="summary-grid">
+                  {SPEED_CATEGORY_ORDER.map((category) => (
+                    <button
+                      key={category}
+                      type="button"
+                      className={`summary-tile summary-tile--${category} ${speedFilters[category] ? 'summary-tile--active' : ''}`}
+                      onClick={() => setSpeedFilters((current) => ({ ...current, [category]: !current[category] }))}
+                    >
+                      <span>{SPEED_CATEGORY_LABELS[category]}</span>
+                      <strong>{speedCalculation.summary[category].toLocaleString()}</strong>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="table-toolbar">
+                  <label className="search-box">
+                    <Search size={17} aria-hidden="true" />
+                    <input
+                      value={speedSearch}
+                      onChange={(event) => setSpeedSearch(event.target.value)}
+                      placeholder="비교 대상 검색"
+                    />
+                  </label>
+                  <label className="sort-box">
+                    <SlidersHorizontal size={17} aria-hidden="true" />
+                    <select value={speedSortKey} onChange={(event) => setSpeedSortKey(event.target.value as SpeedSortKey)}>
+                      <option value="marginDesc">추월 여유 높은순</option>
+                      <option value="targetSpeedDesc">상대 스피드 높은순</option>
+                      <option value="targetSpeedAsc">상대 스피드 낮은순</option>
+                      <option value="nameAsc">한글 이름순</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div className="results-page-meta">
+                  <span>{filteredSpeedResults.length.toLocaleString()}개 결과</span>
+                  <span>{speedDisplayStart}-{speedDisplayEnd} 표시</span>
+                </div>
+
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>비교 대상</th>
+                        <th>타입</th>
+                        <th>내 스피드</th>
+                        <th>상대 스피드</th>
+                        <th>차이</th>
+                        <th>판정</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {visibleSpeedResults.length > 0 ? (
+                        visibleSpeedResults.map((result) => (
+                          <tr key={result.id}>
+                            <td className="pokemon-cell"><span>{result.displayName}</span><small>{result.name}</small></td>
+                            <td>
+                              <div className="type-list">
+                                {result.types.map((type) => <TypeBadge key={type} type={type} />)}
+                              </div>
+                            </td>
+                            <td>{result.selfFinalSpeed}<small className="stat-detail">원본 {result.selfBaseSpeed}</small></td>
+                            <td>{result.targetFinalSpeed}<small className="stat-detail">원본 {result.targetBaseSpeed}</small></td>
+                            <td>{formatSpeedMargin(result.margin)}</td>
+                            <td>
+                              <span className={`verdict verdict--${result.category}`}>
+                                {SPEED_CATEGORY_LABELS[result.category]}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td className="results-empty-row" colSpan={6}>검색 결과 없음</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {filteredSpeedResults.length > 0 ? (
+                  <div className="results-pagination">
+                    <button
+                      type="button"
+                      aria-label="이전 스피드 결과 페이지"
+                      disabled={safeSpeedPage === 0}
+                      onClick={() => setSpeedPage((current) => Math.max(current - 1, 0))}
+                    >
+                      <ChevronLeft size={17} aria-hidden="true" />
+                      이전
+                    </button>
+                    <span>{safeSpeedPage + 1}/{speedPageCount}</span>
+                    <button
+                      type="button"
+                      aria-label="다음 스피드 결과 페이지"
+                      disabled={safeSpeedPage >= speedPageCount - 1}
+                      onClick={() => setSpeedPage((current) => Math.min(current + 1, speedPageCount - 1))}
+                    >
+                      다음
+                      <ChevronRight size={17} aria-hidden="true" />
+                    </button>
+                  </div>
+                ) : null}
+              </>
+            )}
+          </section>
+        </section>
       )}
 
     </main>

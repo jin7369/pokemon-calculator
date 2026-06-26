@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - feature/pwa
   workflow_dispatch:
 
 permissions:
@@ -32,6 +31,10 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Install Linux Rolldown binding
+        if: runner.os == 'Linux'
+        run: npm install --no-save @rolldown/binding-linux-x64-gnu@1.1.2
 
       - name: Lint
         run: npm run lint

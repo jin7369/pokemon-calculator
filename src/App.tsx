@@ -20,6 +20,7 @@ import {
   type SpeciesOption,
   type SortKey,
   type StatKey,
+  type StatPointSpread,
   type SurvivalCategory,
 } from './domain/types';
 import {
@@ -80,6 +81,11 @@ type TabKey = 'attack' | 'defense' | 'speed';
 
 type FilterState = Record<SurvivalCategory, boolean>;
 type SpeedFilterState = Record<SpeedCategory, boolean>;
+type SharedPokemonBuild = {
+  pokemon: string;
+  nature: string;
+  statPoints: StatPointSpread;
+};
 
 const DIRECT_MULTIPLIERS = [0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4];
 const SPEED_DIRECT_MULTIPLIERS = [0.25, 0.5, 1, 1.5, 2, 4];
@@ -136,6 +142,16 @@ const INITIAL_SPEED: SpeedConfig = {
   targetBoostStage: 0,
   targetItem: NO_SPEED_ITEM_ID,
   targetDirectMultiplier: 1,
+};
+
+const INITIAL_SHARED_POKEMON_BUILD: SharedPokemonBuild = {
+  pokemon: '리자몽',
+  nature: 'Modest',
+  statPoints: {
+    ...EMPTY_SPREAD,
+    spa: 31,
+    spe: 31,
+  },
 };
 
 const INITIAL_FILTERS: FilterState = {
@@ -733,6 +749,7 @@ function App() {
   const [attack, setAttack] = useState<AttackConfig>(INITIAL_ATTACK);
   const [defense, setDefense] = useState<DefenseConfig>(INITIAL_DEFENSE);
   const [speed, setSpeed] = useState<SpeedConfig>(INITIAL_SPEED);
+  const [sharedPokemonBuild, setSharedPokemonBuild] = useState<SharedPokemonBuild>(INITIAL_SHARED_POKEMON_BUILD);
   const [defenderBulk, setDefenderBulk] = useState<DefenderBulkConfig>(INITIAL_DEFENDER_BULK);
   const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS);
   const [targetSearch, setTargetSearch] = useState('');
@@ -750,14 +767,16 @@ function App() {
   const debouncedAttack = useDebouncedValue(attack, INPUT_DEBOUNCE_MS);
   const debouncedDefense = useDebouncedValue(defense, INPUT_DEBOUNCE_MS);
   const debouncedSpeed = useDebouncedValue(speed, INPUT_DEBOUNCE_MS);
+  const debouncedSharedPokemonBuild = useDebouncedValue(sharedPokemonBuild, INPUT_DEBOUNCE_MS);
   const debouncedDefenderBulk = useDebouncedValue(defenderBulk, INPUT_DEBOUNCE_MS);
   const debouncedTargetSearch = useDebouncedValue(targetSearch, SEARCH_DEBOUNCE_MS);
   const debouncedDefenseSearch = useDebouncedValue(defenseSearch, SEARCH_DEBOUNCE_MS);
   const debouncedSpeedSearch = useDebouncedValue(speedSearch, SEARCH_DEBOUNCE_MS);
 
-  const selectedAttacker = resolveSpeciesName(attack.attacker);
-  const selectedAttackerOption = selectedAttacker ? getSpeciesOption(selectedAttacker) : null;
-  const selectedAttackerAbilities = selectedAttackerOption?.abilities ?? EMPTY_ABILITY_OPTIONS;
+  const selectedSharedPokemon = resolveSpeciesName(sharedPokemonBuild.pokemon);
+  const selectedSharedPokemonOption = selectedSharedPokemon ? getSpeciesOption(selectedSharedPokemon) : null;
+  const selectedAttacker = selectedSharedPokemon;
+  const selectedAttackerAbilities = selectedSharedPokemonOption?.abilities ?? EMPTY_ABILITY_OPTIONS;
   const selectedAttackerMoveOptions = useMemo(
     () => getLearnableAttackMoveOptionsForSpecies(selectedAttacker),
     [selectedAttacker],
@@ -772,8 +791,7 @@ function App() {
   const finalAttackMultiplier = combinedAttackMultiplier(attack.item, selectedLearnableMove, attack.directMultiplier);
   const activeAttackStat = selectedLearnableMove ? offensiveStatForCategory(selectedLearnableMove.category) : 'spa';
 
-  const selectedDefenseDefender = resolveSpeciesName(defense.defender);
-  const selectedDefenseDefenderOption = selectedDefenseDefender ? getSpeciesOption(selectedDefenseDefender) : null;
+  const selectedDefenseDefender = selectedSharedPokemon;
   const selectedDefenseMoveName = resolveMoveName(defense.move);
   const selectedDefenseMove = selectedDefenseMoveName ? getMoveOption(selectedDefenseMoveName) : null;
   const selectedDefenseHitCount = resolveAttackHitCount(
@@ -795,8 +813,6 @@ function App() {
   const activeDefenseAttackStat = selectedDefenseMove ? offensiveStatForCategory(selectedDefenseMove.category) : 'spa';
   const activeDefenseBulkStat = selectedDefenseMove ? defensiveStatForCategory(selectedDefenseMove.category) : 'spd';
 
-  const selectedSpeedPokemon = resolveSpeciesName(speed.pokemon);
-  const selectedSpeedOption = selectedSpeedPokemon ? getSpeciesOption(selectedSpeedPokemon) : null;
   const selectedSpeedItem = getSpeedItemOption(speed.item);
   const selectedTargetSpeedItem = getSpeedItemOption(speed.targetItem);
   const finalSpeedMultiplier = selectedSpeedItem.multiplier * speed.directMultiplier;
@@ -842,7 +858,7 @@ function App() {
   }, [defense.hitCount, selectedDefenseMove]);
 
   const calculationAttack = useMemo<AttackConfig | null>(() => {
-    const calculationAttacker = resolveSpeciesName(debouncedAttack.attacker);
+    const calculationAttacker = resolveSpeciesName(debouncedSharedPokemonBuild.pokemon);
     const calculationMove = resolveMoveName(debouncedAttack.move);
 
     if (
@@ -855,8 +871,13 @@ function App() {
       ...debouncedAttack,
       attacker: calculationAttacker,
       move: calculationMove,
+      nature: debouncedSharedPokemonBuild.nature,
+      attackStatPoints: {
+        atk: debouncedSharedPokemonBuild.statPoints.atk,
+        spa: debouncedSharedPokemonBuild.statPoints.spa,
+      },
     };
-  }, [debouncedAttack]);
+  }, [debouncedAttack, debouncedSharedPokemonBuild]);
 
   const calculation = useMemo(() => {
     if (!calculationAttack) return { results: [], summary: { survives: 0, roll: 0, ko: 0, total: 0 } };
@@ -864,7 +885,7 @@ function App() {
   }, [calculationAttack, debouncedDefenderBulk]);
 
   const calculationDefense = useMemo<DefenseConfig | null>(() => {
-    const calculationDefender = resolveSpeciesName(debouncedDefense.defender);
+    const calculationDefender = resolveSpeciesName(debouncedSharedPokemonBuild.pokemon);
     const calculationMove = resolveMoveName(debouncedDefense.move);
 
     if (!calculationDefender || !calculationMove) return null;
@@ -873,8 +894,14 @@ function App() {
       ...debouncedDefense,
       defender: calculationDefender,
       move: calculationMove,
+      nature: debouncedSharedPokemonBuild.nature,
+      statPoints: {
+        hp: debouncedSharedPokemonBuild.statPoints.hp,
+        def: debouncedSharedPokemonBuild.statPoints.def,
+        spd: debouncedSharedPokemonBuild.statPoints.spd,
+      },
     };
-  }, [debouncedDefense]);
+  }, [debouncedDefense, debouncedSharedPokemonBuild]);
 
   const calculationDefenseAttackers = useMemo(
     () => getSpeciesOptionsThatLearnMove(calculationDefense?.move ?? null),
@@ -887,14 +914,18 @@ function App() {
   }, [calculationDefense, calculationDefenseAttackers]);
 
   const calculationSpeed = useMemo<SpeedConfig | null>(() => {
-    const calculationPokemon = resolveSpeciesName(debouncedSpeed.pokemon);
+    const calculationPokemon = resolveSpeciesName(debouncedSharedPokemonBuild.pokemon);
     if (!calculationPokemon) return null;
 
     return {
       ...debouncedSpeed,
       pokemon: calculationPokemon,
+      nature: debouncedSharedPokemonBuild.nature,
+      statPoints: {
+        spe: debouncedSharedPokemonBuild.statPoints.spe,
+      },
     };
-  }, [debouncedSpeed]);
+  }, [debouncedSpeed, debouncedSharedPokemonBuild]);
 
   const speedCalculation = useMemo(() => {
     if (!calculationSpeed) return { results: [], summary: { outspeeds: 0, tie: 0, slower: 0, total: 0 } };
@@ -976,25 +1007,35 @@ function App() {
   const speedDisplayStart = filteredSpeedResults.length > 0 ? speedPageStart + 1 : 0;
   const speedDisplayEnd = speedPageStart + visibleSpeedResults.length;
 
-  const attackPointSpread = toFullSpread(attack.attackStatPoints);
+  const sharedPointSpread = toFullSpread(sharedPokemonBuild.statPoints);
   const defensePointSpread = toFullSpread(defenderBulk.statPoints);
-  const defenseCalculatorPointSpread = toFullSpread(defense.statPoints);
   const defenseAttackerPointSpread = toFullSpread(defense.attackerStatPoints);
-  const speedPointSpread = toFullSpread(speed.statPoints);
   const targetSpeedPointSpread = toFullSpread(speed.targetStatPoints);
-  const attackPointTotal = totalStatPoints(attackPointSpread);
+  const sharedPointTotal = totalStatPoints(sharedPointSpread);
   const defensePointTotal = totalStatPoints(defensePointSpread);
-  const defenseCalculatorPointTotal = totalStatPoints(defenseCalculatorPointSpread);
   const defenseAttackerPointTotal = totalStatPoints(defenseAttackerPointSpread);
-  const speedPointTotal = totalStatPoints(speedPointSpread);
   const targetSpeedPointTotal = totalStatPoints(targetSpeedPointSpread);
 
-  function setAttackStatPoint(stat: 'atk' | 'spa', value: number) {
-    setAttack((current) => {
-      const next = updateStatPoint(toFullSpread(current.attackStatPoints), stat, value);
+  function setSharedPokemon(value: string) {
+    setSharedPokemonBuild((current) => ({
+      ...current,
+      pokemon: value,
+    }));
+  }
+
+  function setSharedNature(value: string) {
+    setSharedPokemonBuild((current) => ({
+      ...current,
+      nature: value,
+    }));
+  }
+
+  function setSharedStatPoint(stat: StatKey, value: number) {
+    setSharedPokemonBuild((current) => {
+      const next = updateStatPoint(current.statPoints, stat, value);
       return {
         ...current,
-        attackStatPoints: { atk: next.atk, spa: next.spa },
+        statPoints: next,
       };
     });
   }
@@ -1009,32 +1050,12 @@ function App() {
     });
   }
 
-  function setDefenseStatPoint(stat: 'hp' | 'def' | 'spd', value: number) {
-    setDefense((current) => {
-      const next = updateStatPoint(toFullSpread(current.statPoints), stat, value);
-      return {
-        ...current,
-        statPoints: { hp: next.hp, def: next.def, spd: next.spd },
-      };
-    });
-  }
-
   function setDefenseAttackerStatPoint(stat: 'atk' | 'spa', value: number) {
     setDefense((current) => {
       const next = updateStatPoint(toFullSpread(current.attackerStatPoints), stat, value);
       return {
         ...current,
         attackerStatPoints: { atk: next.atk, spa: next.spa },
-      };
-    });
-  }
-
-  function setSpeedStatPoint(value: number) {
-    setSpeed((current) => {
-      const next = updateStatPoint(toFullSpread(current.statPoints), 'spe', value);
-      return {
-        ...current,
-        statPoints: { spe: next.spe },
       };
     });
   }
@@ -1084,16 +1105,16 @@ function App() {
 
               <PokemonPicker
                 label="공격 포켓몬"
-                value={attack.attacker}
-                selected={selectedAttackerOption}
+                value={sharedPokemonBuild.pokemon}
+                selected={selectedSharedPokemonOption}
                 options={POKEMON_OPTIONS}
-                onChange={(value) => setAttack((current) => ({ ...current, attacker: value }))}
+                onChange={setSharedPokemon}
               />
 
               <BaseStatsTable
-                species={selectedAttackerOption}
-                nature={attack.nature}
-                statPoints={attack.attackStatPoints}
+                species={selectedSharedPokemonOption}
+                nature={sharedPokemonBuild.nature}
+                statPoints={sharedPokemonBuild.statPoints}
               />
 
               <div className="ability-panel">
@@ -1204,8 +1225,8 @@ function App() {
 
               <NatureModifierPicker
                 label="성격"
-                value={attack.nature}
-                onChange={(value) => setAttack((current) => ({ ...current, nature: value }))}
+                value={sharedPokemonBuild.nature}
+                onChange={setSharedNature}
               />
 
               <div className="stat-block">
@@ -1215,15 +1236,15 @@ function App() {
                 </div>
                 <StatPointControl
                   stat="atk"
-                  value={attack.attackStatPoints.atk}
-                  total={attackPointTotal}
-                  onChange={(value) => setAttackStatPoint('atk', value)}
+                  value={sharedPokemonBuild.statPoints.atk}
+                  total={sharedPointTotal}
+                  onChange={(value) => setSharedStatPoint('atk', value)}
                 />
                 <StatPointControl
                   stat="spa"
-                  value={attack.attackStatPoints.spa}
-                  total={attackPointTotal}
-                  onChange={(value) => setAttackStatPoint('spa', value)}
+                  value={sharedPokemonBuild.statPoints.spa}
+                  total={sharedPointTotal}
+                  onChange={(value) => setSharedStatPoint('spa', value)}
                 />
               </div>
 
@@ -1427,16 +1448,16 @@ function App() {
 
               <PokemonPicker
                 label="피격 포켓몬"
-                value={defense.defender}
-                selected={selectedDefenseDefenderOption}
+                value={sharedPokemonBuild.pokemon}
+                selected={selectedSharedPokemonOption}
                 options={POKEMON_OPTIONS}
-                onChange={(value) => setDefense((current) => ({ ...current, defender: value }))}
+                onChange={setSharedPokemon}
               />
 
               <BaseStatsTable
-                species={selectedDefenseDefenderOption}
-                nature={defense.nature}
-                statPoints={defense.statPoints}
+                species={selectedSharedPokemonOption}
+                nature={sharedPokemonBuild.nature}
+                statPoints={sharedPokemonBuild.statPoints}
               />
 
               <MovePicker
@@ -1500,8 +1521,8 @@ function App() {
 
               <NatureModifierPicker
                 label="피격 성격"
-                value={defense.nature}
-                onChange={(value) => setDefense((current) => ({ ...current, nature: value }))}
+                value={sharedPokemonBuild.nature}
+                onChange={setSharedNature}
               />
 
               <div className="stat-block">
@@ -1511,21 +1532,21 @@ function App() {
                 </div>
                 <StatPointControl
                   stat="hp"
-                  value={defense.statPoints.hp}
-                  total={defenseCalculatorPointTotal}
-                  onChange={(value) => setDefenseStatPoint('hp', value)}
+                  value={sharedPokemonBuild.statPoints.hp}
+                  total={sharedPointTotal}
+                  onChange={(value) => setSharedStatPoint('hp', value)}
                 />
                 <StatPointControl
                   stat="def"
-                  value={defense.statPoints.def}
-                  total={defenseCalculatorPointTotal}
-                  onChange={(value) => setDefenseStatPoint('def', value)}
+                  value={sharedPokemonBuild.statPoints.def}
+                  total={sharedPointTotal}
+                  onChange={(value) => setSharedStatPoint('def', value)}
                 />
                 <StatPointControl
                   stat="spd"
-                  value={defense.statPoints.spd}
-                  total={defenseCalculatorPointTotal}
-                  onChange={(value) => setDefenseStatPoint('spd', value)}
+                  value={sharedPokemonBuild.statPoints.spd}
+                  total={sharedPointTotal}
+                  onChange={(value) => setSharedStatPoint('spd', value)}
                 />
               </div>
             </section>
@@ -1741,34 +1762,34 @@ function App() {
 
               <PokemonPicker
                 label="기준 포켓몬"
-                value={speed.pokemon}
-                selected={selectedSpeedOption}
+                value={sharedPokemonBuild.pokemon}
+                selected={selectedSharedPokemonOption}
                 options={POKEMON_OPTIONS}
-                onChange={(value) => setSpeed((current) => ({ ...current, pokemon: value }))}
+                onChange={setSharedPokemon}
               />
 
               <BaseStatsTable
-                species={selectedSpeedOption}
-                nature={speed.nature}
-                statPoints={speed.statPoints}
+                species={selectedSharedPokemonOption}
+                nature={sharedPokemonBuild.nature}
+                statPoints={sharedPokemonBuild.statPoints}
               />
 
               <NatureModifierPicker
                 label="성격"
-                value={speed.nature}
-                onChange={(value) => setSpeed((current) => ({ ...current, nature: value }))}
+                value={sharedPokemonBuild.nature}
+                onChange={setSharedNature}
               />
 
               <div className="stat-block">
                 <div className="stat-block__header">
                   <span>스피드 Stat Points</span>
-                  <strong>{speedPointTotal}/{STAT_POINT_TOTAL_LIMIT}</strong>
+                  <strong>{sharedPointTotal}/{STAT_POINT_TOTAL_LIMIT}</strong>
                 </div>
                 <StatPointControl
                   stat="spe"
-                  value={speed.statPoints.spe}
-                  total={speedPointTotal}
-                  onChange={setSpeedStatPoint}
+                  value={sharedPokemonBuild.statPoints.spe}
+                  total={sharedPointTotal}
+                  onChange={(value) => setSharedStatPoint('spe', value)}
                 />
               </div>
 
@@ -1901,7 +1922,7 @@ function App() {
               </div>
             </div>
 
-            {!selectedSpeedOption ? (
+            {!selectedSharedPokemonOption ? (
               <div className="invalid-state">기준 포켓몬 이름을 확인하세요.</div>
             ) : (
               <>

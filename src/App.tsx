@@ -45,6 +45,7 @@ import {
 import {
   STAT_POINT_PER_STAT_LIMIT,
   STAT_POINT_TOTAL_LIMIT,
+  normalizeStatPoints,
   totalStatPoints,
   updateStatPoint,
 } from './domain/statPoints';
@@ -70,6 +71,10 @@ import {
   formatMoveHitRange,
   resolveAttackHitCount,
 } from './domain/multiHit';
+import {
+  calculateBattleStats,
+  calculatePerStatMaximumStats,
+} from './domain/battleStats';
 
 type TabKey = 'attack' | 'defense' | 'speed';
 
@@ -162,6 +167,12 @@ function formatBoost(stage: number): string {
 function formatSpeedMargin(value: number): string {
   if (value > 0) return `+${value}`;
   return `${value}`;
+}
+
+function formatNatureSummary(nature: string): string {
+  const modifiers = natureModifiersForName(nature);
+  if (!modifiers.plus || !modifiers.minus) return `${nature} · 무보정`;
+  return `${nature} · +${STAT_LABELS[modifiers.plus]} / -${STAT_LABELS[modifiers.minus]}`;
 }
 
 function parseHitCountSetting(value: string): HitCountSetting {
@@ -642,20 +653,38 @@ function MovePicker({
   );
 }
 
-function BaseStatsTable({ species }: { species: SpeciesOption | null }) {
+function BaseStatsTable({
+  species,
+  nature,
+  statPoints = EMPTY_SPREAD,
+}: {
+  species: SpeciesOption | null;
+  nature?: string;
+  statPoints?: Partial<Record<StatKey, number>>;
+}) {
   if (!species) return null;
 
   const total = baseStatTotal(species);
+  const normalizedPoints = normalizeStatPoints(statPoints);
+  const currentStats = nature ? calculateBattleStats(species, nature, normalizedPoints) : null;
+  const maximumStats = nature ? calculatePerStatMaximumStats(species, nature) : null;
+  const currentTotal = currentStats
+    ? STAT_KEYS.reduce((sum, stat) => sum + currentStats[stat], 0)
+    : 0;
+  const maximumTotal = maximumStats
+    ? STAT_KEYS.reduce((sum, stat) => sum + maximumStats[stat], 0)
+    : 0;
 
   return (
-    <div className="base-stats-panel" aria-label={`${species.displayName} 종족값`}>
+    <div className="base-stats-panel" aria-label={`${species.displayName} 스탯`}>
       <div className="base-stats-panel__title">
         <span>{species.displayName}</span>
-        <small>{species.name}</small>
+        <small>{nature ? formatNatureSummary(nature) : species.name}</small>
       </div>
       <table className="base-stats-table">
         <thead>
           <tr>
+            <th>구분</th>
             {STAT_KEYS.map((stat) => (
               <th key={stat}>{STAT_LABELS[stat]}</th>
             ))}
@@ -664,11 +693,35 @@ function BaseStatsTable({ species }: { species: SpeciesOption | null }) {
         </thead>
         <tbody>
           <tr>
+            <th scope="row">종족값</th>
             {STAT_KEYS.map((stat) => (
               <td key={stat}>{species.baseStats[stat]}</td>
             ))}
             <td>{total}</td>
           </tr>
+          {currentStats ? (
+            <tr>
+              <th scope="row">현재</th>
+              {STAT_KEYS.map((stat) => (
+                <td key={stat}>
+                  <span className="stat-value">
+                    <strong>{currentStats[stat]}</strong>
+                    <small>{normalizedPoints[stat]}P</small>
+                  </span>
+                </td>
+              ))}
+              <td>{currentTotal}</td>
+            </tr>
+          ) : null}
+          {maximumStats ? (
+            <tr>
+              <th scope="row">31P 최대</th>
+              {STAT_KEYS.map((stat) => (
+                <td key={stat}>{maximumStats[stat]}</td>
+              ))}
+              <td>{maximumTotal}</td>
+            </tr>
+          ) : null}
         </tbody>
       </table>
     </div>
@@ -1037,7 +1090,11 @@ function App() {
                 onChange={(value) => setAttack((current) => ({ ...current, attacker: value }))}
               />
 
-              <BaseStatsTable species={selectedAttackerOption} />
+              <BaseStatsTable
+                species={selectedAttackerOption}
+                nature={attack.nature}
+                statPoints={attack.attackStatPoints}
+              />
 
               <div className="ability-panel">
                 <label className="ability-toggle">
@@ -1376,7 +1433,11 @@ function App() {
                 onChange={(value) => setDefense((current) => ({ ...current, defender: value }))}
               />
 
-              <BaseStatsTable species={selectedDefenseDefenderOption} />
+              <BaseStatsTable
+                species={selectedDefenseDefenderOption}
+                nature={defense.nature}
+                statPoints={defense.statPoints}
+              />
 
               <MovePicker
                 label="받을 기술"
@@ -1686,7 +1747,11 @@ function App() {
                 onChange={(value) => setSpeed((current) => ({ ...current, pokemon: value }))}
               />
 
-              <BaseStatsTable species={selectedSpeedOption} />
+              <BaseStatsTable
+                species={selectedSpeedOption}
+                nature={speed.nature}
+                statPoints={speed.statPoints}
+              />
 
               <NatureModifierPicker
                 label="성격"

@@ -556,6 +556,28 @@ h2 {
   font-weight: 800;
 }
 
+.base-stats-table tbody th {
+  color: #354352;
+  font-size: 11px;
+  text-align: left;
+}
+
+.stat-value {
+  display: inline-grid;
+  gap: 1px;
+  line-height: 1.1;
+}
+
+.stat-value strong {
+  font-size: 12px;
+}
+
+.stat-value small {
+  color: #697586;
+  font-size: 10px;
+  font-weight: 800;
+}
+
 .nature-picker {
   display: grid;
   gap: 10px;

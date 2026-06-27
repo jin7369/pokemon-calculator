@@ -1,8 +1,9 @@
-const CACHE_NAME = 'pokemon-calculator-v1';
+const CACHE_NAME = 'pokemon-calculator-v2';
 const APP_SHELL = [
   './',
   './index.html',
   './manifest.webmanifest',
+  './third-party-notices.txt',
   './favicon.svg',
   './app-icon-192.png',
   './app-icon-512.png',

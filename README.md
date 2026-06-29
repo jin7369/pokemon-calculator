@@ -6,6 +6,8 @@ Pokemon Champions 기준의 웹 기반 배틀 스탯 계산기입니다.
 
 포트폴리오 문서: `PORTFOLIO.md`
 
+패치노트: `PATCH_NOTES.md`
+
 ## 주요 기능
 
 - 공통 포켓몬 빌드

@@ -115,6 +115,7 @@ const INITIAL_ATTACK: AttackConfig = {
 const INITIAL_DEFENDER_BULK: DefenderBulkConfig = {
   nature: 'Serious',
   statPoints: { hp: 0, def: 0, spd: 0 },
+  targetHasHeldItem: true,
 };
 
 const INITIAL_DEFENSE: DefenseConfig = {
@@ -122,6 +123,7 @@ const INITIAL_DEFENSE: DefenseConfig = {
   move: '화염방사',
   nature: 'Serious',
   statPoints: { hp: 0, def: 0, spd: 0 },
+  defenderHasHeldItem: true,
   attackerNature: 'Modest',
   attackerStatPoints: { atk: 0, spa: 31 },
   attackerBoostStage: 0,
@@ -1287,6 +1289,21 @@ function App() {
                 onChange={(value) => setDefenderBulk((current) => ({ ...current, nature: value }))}
               />
 
+              <label className="ability-toggle condition-toggle">
+                <input
+                  type="checkbox"
+                  checked={defenderBulk.targetHasHeldItem}
+                  onChange={(event) => setDefenderBulk((current) => ({
+                    ...current,
+                    targetHasHeldItem: event.target.checked,
+                  }))}
+                />
+                <span>
+                  <strong>피격 대상 도구 보유</strong>
+                  <small>{defenderBulk.targetHasHeldItem ? 'ON' : 'OFF'}</small>
+                </span>
+              </label>
+
               <div className="stat-block">
                 <div className="stat-block__header">
                   <span>내구 Stat Points</span>
@@ -1518,6 +1535,21 @@ function App() {
                   </small>
                 </div>
               ) : null}
+
+              <label className="ability-toggle condition-toggle">
+                <input
+                  type="checkbox"
+                  checked={defense.defenderHasHeldItem}
+                  onChange={(event) => setDefense((current) => ({
+                    ...current,
+                    defenderHasHeldItem: event.target.checked,
+                  }))}
+                />
+                <span>
+                  <strong>피격 포켓몬 도구 보유</strong>
+                  <small>{defense.defenderHasHeldItem ? 'ON' : 'OFF'}</small>
+                </span>
+              </label>
 
               <NatureModifierPicker
                 label="피격 성격"

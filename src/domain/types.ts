@@ -59,6 +59,7 @@ export interface DefenseConfig {
   move: string;
   nature: string;
   statPoints: Pick<StatPointSpread, 'hp' | 'def' | 'spd'>;
+  defenderHasHeldItem: boolean;
   attackerNature: string;
   attackerStatPoints: Pick<StatPointSpread, 'atk' | 'spa'>;
   attackerBoostStage: number;
@@ -84,6 +85,7 @@ export interface SpeedConfig {
 export interface DefenderBulkConfig {
   nature: string;
   statPoints: Pick<StatPointSpread, 'hp' | 'def' | 'spd'>;
+  targetHasHeldItem: boolean;
 }
 
 export interface DamageResult {

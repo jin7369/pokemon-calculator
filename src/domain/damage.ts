@@ -26,6 +26,7 @@ const EMPTY_BOOSTS: StatsTable = {
   spe: 0,
 };
 const NO_ABILITY = 'No Ability';
+const NEUTRAL_HELD_ITEM = 'Leftovers';
 
 export function offensiveStatForCategory(category: MoveCategory): 'atk' | 'spa' {
   return category === 'Physical' ? 'atk' : 'spa';
@@ -123,6 +124,7 @@ export function calculateAttackResults(
       const defender = new Pokemon(GEN, target.name, {
         level: BATTLE_LEVEL,
         ability: NO_ABILITY,
+        item: defenderBulk.targetHasHeldItem ? NEUTRAL_HELD_ITEM : undefined,
         nature: defenderBulk.nature,
         evs: defenderEvs,
       });
@@ -186,6 +188,7 @@ export function calculateDefenseResults(
   const defender = new Pokemon(GEN, defenderOption.name, {
     level: BATTLE_LEVEL,
     ability: NO_ABILITY,
+    item: defense.defenderHasHeldItem ? NEUTRAL_HELD_ITEM : undefined,
     nature: defense.nature,
     evs: defenderEvs,
   });

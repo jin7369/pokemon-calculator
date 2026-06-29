@@ -6,6 +6,7 @@ import type { AttackConfig, DefenseConfig, DefenderBulkConfig } from './types';
 const neutralBulk: DefenderBulkConfig = {
   nature: 'Serious',
   statPoints: { hp: 0, def: 0, spd: 0 },
+  targetHasHeldItem: true,
 };
 
 describe('damage helpers', () => {
@@ -163,6 +164,36 @@ describe('damage helpers', () => {
     expect(enabled.maxDamage).toBeGreaterThan(disabled.maxDamage);
   });
 
+  it('applies the held item condition for Poltergeist in attack calculations', () => {
+    const gholdengo = getSpeciesOption('Gholdengo');
+    const attack: AttackConfig = {
+      attacker: 'Dragapult',
+      move: 'Poltergeist',
+      item: 'none',
+      ability: 'Infiltrator',
+      abilityEnabled: false,
+      hitCount: 'auto',
+      nature: 'Adamant',
+      attackStatPoints: { atk: 31, spa: 0 },
+      boostStage: 0,
+      directMultiplier: 1,
+    };
+
+    const noItem = calculateAttackResults(
+      attack,
+      { ...neutralBulk, targetHasHeldItem: false },
+      gholdengo ? [gholdengo] : [],
+    ).results[0];
+    const withItem = calculateAttackResults(
+      attack,
+      { ...neutralBulk, targetHasHeldItem: true },
+      gholdengo ? [gholdengo] : [],
+    ).results[0];
+
+    expect(noItem.maxDamage).toBe(0);
+    expect(withItem.maxDamage).toBeGreaterThan(0);
+  });
+
   it('calculates incoming damage from species that can learn the selected move', () => {
     const flamethrowerLearners = getSpeciesOptionsThatLearnMove('Flamethrower');
     const defense: DefenseConfig = {
@@ -170,6 +201,7 @@ describe('damage helpers', () => {
       move: 'Flamethrower',
       nature: 'Serious',
       statPoints: { hp: 0, def: 0, spd: 0 },
+      defenderHasHeldItem: true,
       attackerNature: 'Modest',
       attackerStatPoints: { atk: 0, spa: 31 },
       attackerBoostStage: 0,
@@ -185,5 +217,31 @@ describe('damage helpers', () => {
     expect(summary.total).toBe(results.length);
     expect(charizardResult?.maxDamage).toBeGreaterThan(0);
     expect(results.some((result) => result.name === 'Pikachu')).toBe(false);
+  });
+
+  it('applies the held item condition for Poltergeist in defense calculations', () => {
+    const dragapult = getSpeciesOption('Dragapult');
+    const defense: DefenseConfig = {
+      defender: 'Gholdengo',
+      move: 'Poltergeist',
+      nature: 'Serious',
+      statPoints: { hp: 0, def: 0, spd: 0 },
+      defenderHasHeldItem: false,
+      attackerNature: 'Adamant',
+      attackerStatPoints: { atk: 31, spa: 0 },
+      attackerBoostStage: 0,
+      attackerItem: 'none',
+      attackerDirectMultiplier: 1,
+      hitCount: 'auto',
+    };
+
+    const noItem = calculateDefenseResults(defense, dragapult ? [dragapult] : []).results[0];
+    const withItem = calculateDefenseResults(
+      { ...defense, defenderHasHeldItem: true },
+      dragapult ? [dragapult] : [],
+    ).results[0];
+
+    expect(noItem.maxDamage).toBe(0);
+    expect(withItem.maxDamage).toBeGreaterThan(0);
   });
 });

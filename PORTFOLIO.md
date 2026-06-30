@@ -86,9 +86,9 @@ Pokemon Champions Battle Calculator는 Pokemon Champions 룰 기준으로 포켓
 
 - `damage.ts`: 공격/수비 데미지 계산과 결과 분류
 - `speed.ts`: 스피드 계산과 추월 판정
-- `statPoints.ts`: Stat Points 제한과 EV 환산
+- `statPoints.ts`: Stat Points 제한과 데미지 엔진용 EV 환산
 - `multiHit.ts`: 다단히트 기술 처리
-- `battleStats.ts`: 선택 포켓몬의 실제 Lv50 스탯 계산
+- `battleStats.ts`: 선택 포켓몬의 Pokemon Champions 실수치 계산
 - `pokemonData.ts`: 포켓몬, 기술, 성격, 이름 매칭 데이터 조합
 
 이 구조는 계산 규칙을 UI 변경과 독립적으로 검증하기 위한 선택입니다.
@@ -197,4 +197,3 @@ Champions 룰 포켓몬 목록과 계산용 파생 폼을 코드 로직에 흩�
 이 프로젝트에서 가장 중요한 설계 포인트는 "계산 기능을 많이 넣는 것"보다 "사용자가 실제로 조정하는 사고 흐름에 맞게 상태를 설계하는 것"이었습니다.
 
 공격, 수비, 스피드는 기능적으로는 다른 계산이지만, 사용자는 결국 한 마리 포켓몬의 샘플을 만들고 있습니다. 이 관점을 반영해 공통 포켓몬 빌드 상태를 도입하면서 도구의 방향성이 더 선명해졌습니다.
-

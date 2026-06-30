@@ -3,8 +3,9 @@ import type { StatKey, StatPointSpread } from './types';
 import { EMPTY_SPREAD, STAT_KEYS } from './types';
 
 export const STAT_POINT_TOTAL_LIMIT = 66;
-export const STAT_POINT_PER_STAT_LIMIT = 31;
+export const STAT_POINT_PER_STAT_LIMIT = 32;
 export const STAT_POINT_EV_RATIO = 8;
+export const STAT_POINT_MAX_EV = 252;
 
 export function clampStatPoint(value: number): number {
   if (Number.isNaN(value)) return 0;
@@ -47,13 +48,14 @@ export function updateStatPoint(
 
 export function statPointsToEvs(spread: Partial<StatPointSpread>): StatsTable {
   const normalized = normalizeStatPoints(spread);
+  const toEv = (points: number) => Math.min(points * STAT_POINT_EV_RATIO, STAT_POINT_MAX_EV);
 
   return {
-    hp: normalized.hp * STAT_POINT_EV_RATIO,
-    atk: normalized.atk * STAT_POINT_EV_RATIO,
-    def: normalized.def * STAT_POINT_EV_RATIO,
-    spa: normalized.spa * STAT_POINT_EV_RATIO,
-    spd: normalized.spd * STAT_POINT_EV_RATIO,
-    spe: normalized.spe * STAT_POINT_EV_RATIO,
+    hp: toEv(normalized.hp),
+    atk: toEv(normalized.atk),
+    def: toEv(normalized.def),
+    spa: toEv(normalized.spa),
+    spd: toEv(normalized.spd),
+    spe: toEv(normalized.spe),
   };
 }

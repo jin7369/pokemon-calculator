@@ -45,8 +45,9 @@ Pokemon Champions 기준의 웹 기반 배틀 스탯 계산기입니다.
   - https://web-view.app.pokemonchampions.jp/battle/pages/regulations/r1780458vgoech/ko/pokemon.html
 - Stat Points:
   - 총합 제한: 66
-  - 능력치당 제한: 31
-  - 환산식: `1 Stat Point = 8 EV`
+  - 능력치당 제한: 32
+  - 표시 실수치: Pokemon Champions 공식 적용
+  - 계산 엔진 환산: `0-31P = Stat Point × 8 EV`, `32P = 252 EV`
 
 현재 명시적으로 설정하지 않는 조건은 계산에서 일반 조건으로 두고 있습니다. 방어 측 특성, 날씨, 필드, 벽, 크리티컬 등은 별도 UI가 생기기 전까지 범용 계산 조건으로 취급하지 않습니다.
 

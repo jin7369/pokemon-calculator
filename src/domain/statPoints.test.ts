@@ -17,23 +17,29 @@ describe('stat point helpers', () => {
     expect(evs.spa).toBe(96);
   });
 
-  it('caps each stat at 31 points', () => {
+  it('maps 32 Champions stat points to the level 50 EV cap', () => {
+    const evs = statPointsToEvs({ def: 32 });
+
+    expect(evs.def).toBe(252);
+  });
+
+  it('caps each stat at 32 points', () => {
     const spread = normalizeStatPoints({ atk: 80 });
 
     expect(spread.atk).toBe(STAT_POINT_PER_STAT_LIMIT);
   });
 
   it('keeps the full spread under 66 total points', () => {
-    const spread = normalizeStatPoints({ hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 });
+    const spread = normalizeStatPoints({ hp: 32, atk: 32, def: 32, spa: 32, spd: 32, spe: 32 });
 
     expect(totalStatPoints(spread)).toBeLessThanOrEqual(STAT_POINT_TOTAL_LIMIT);
   });
 
   it('caps a changed stat by the remaining total budget', () => {
-    const current = { ...EMPTY_SPREAD, hp: 31, def: 31, spd: 4 };
-    const next = updateStatPoint(current, 'spd', 31);
+    const current = { ...EMPTY_SPREAD, hp: 32, def: 32, spd: 2 };
+    const next = updateStatPoint(current, 'spd', 32);
 
-    expect(next.spd).toBe(4);
+    expect(next.spd).toBe(2);
     expect(totalStatPoints(next)).toBe(STAT_POINT_TOTAL_LIMIT);
   });
 });

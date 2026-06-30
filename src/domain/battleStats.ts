@@ -1,10 +1,7 @@
 import type { SpeciesOption, StatKey, StatPointSpread } from './types';
 import { EMPTY_SPREAD, STAT_KEYS } from './types';
 import { natureModifiersForName } from './pokemonData';
-import { STAT_POINT_PER_STAT_LIMIT, statPointsToEvs } from './statPoints';
-
-export const DEFAULT_IV = 31;
-export const DEFAULT_BATTLE_LEVEL = 50;
+import { STAT_POINT_PER_STAT_LIMIT, normalizeStatPoints } from './statPoints';
 
 export function natureMultiplierForStat(nature: string, stat: StatKey): number {
   if (stat === 'hp') return 1;
@@ -20,14 +17,12 @@ export function calculateBattleStat(
   stat: StatKey,
   nature: string,
   statPoints: Partial<StatPointSpread>,
-  level = DEFAULT_BATTLE_LEVEL,
 ): number {
-  const ev = statPointsToEvs(statPoints)[stat];
-  const baseValue = Math.floor(((2 * species.baseStats[stat] + DEFAULT_IV + Math.floor(ev / 4)) * level) / 100);
+  const points = normalizeStatPoints(statPoints)[stat];
 
-  if (stat === 'hp') return baseValue + level + 10;
+  if (stat === 'hp') return species.baseStats.hp + points + 75;
 
-  return Math.floor((baseValue + 5) * natureMultiplierForStat(nature, stat));
+  return Math.floor((species.baseStats[stat] + points + 20) * natureMultiplierForStat(nature, stat));
 }
 
 export function calculateBattleStats(

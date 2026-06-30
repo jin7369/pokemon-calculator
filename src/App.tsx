@@ -107,7 +107,7 @@ const INITIAL_ATTACK: AttackConfig = {
   abilityEnabled: false,
   hitCount: 'auto',
   nature: 'Modest',
-  attackStatPoints: { atk: 0, spa: 31 },
+  attackStatPoints: { atk: 0, spa: 32 },
   boostStage: 0,
   directMultiplier: 1,
 };
@@ -125,7 +125,7 @@ const INITIAL_DEFENSE: DefenseConfig = {
   statPoints: { hp: 0, def: 0, spd: 0 },
   defenderHasHeldItem: true,
   attackerNature: 'Modest',
-  attackerStatPoints: { atk: 0, spa: 31 },
+  attackerStatPoints: { atk: 0, spa: 32 },
   attackerBoostStage: 0,
   attackerItem: NO_OFFENSE_ITEM_ID,
   attackerDirectMultiplier: 1,
@@ -135,12 +135,12 @@ const INITIAL_DEFENSE: DefenseConfig = {
 const INITIAL_SPEED: SpeedConfig = {
   pokemon: '리자몽',
   nature: 'Timid',
-  statPoints: { spe: 31 },
+  statPoints: { spe: 32 },
   boostStage: 0,
   item: NO_SPEED_ITEM_ID,
   directMultiplier: 1,
   targetNature: 'Timid',
-  targetStatPoints: { spe: 31 },
+  targetStatPoints: { spe: 32 },
   targetBoostStage: 0,
   targetItem: NO_SPEED_ITEM_ID,
   targetDirectMultiplier: 1,
@@ -151,8 +151,8 @@ const INITIAL_SHARED_POKEMON_BUILD: SharedPokemonBuild = {
   nature: 'Modest',
   statPoints: {
     ...EMPTY_SPREAD,
-    spa: 31,
-    spe: 31,
+    spa: 32,
+    spe: 32,
   },
 };
 
@@ -733,7 +733,7 @@ function BaseStatsTable({
           ) : null}
           {maximumStats ? (
             <tr>
-              <th scope="row">31P 최대</th>
+              <th scope="row">{STAT_POINT_PER_STAT_LIMIT}P 최대</th>
               {STAT_KEYS.map((stat) => (
                 <td key={stat}>{maximumStats[stat]}</td>
               ))}

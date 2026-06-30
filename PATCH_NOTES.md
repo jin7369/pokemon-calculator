@@ -20,7 +20,8 @@
 
 ### 배포
 
-- GitHub Pages 배포 예정
+- 커밋: `9606f8f Update Champions stat point calculation`
+- GitHub Pages 배포 성공 확인
 
 ## 2026-06-29
 

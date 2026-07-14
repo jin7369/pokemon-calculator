@@ -23,6 +23,7 @@
 ### 배포
 
 - 커밋: `7ff2842 Fix Champions Mega Starmie stats`
+- 커밋: `be4c173 Start stat points at zero`
 - GitHub Pages 배포 성공 확인
 - 배포 주소: https://jin7369.github.io/pokemon-calculator/
 

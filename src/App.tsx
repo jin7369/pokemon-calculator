@@ -107,7 +107,7 @@ const INITIAL_ATTACK: AttackConfig = {
   abilityEnabled: false,
   hitCount: 'auto',
   nature: 'Modest',
-  attackStatPoints: { atk: 0, spa: 32 },
+  attackStatPoints: { atk: 0, spa: 0 },
   boostStage: 0,
   directMultiplier: 1,
 };
@@ -125,7 +125,7 @@ const INITIAL_DEFENSE: DefenseConfig = {
   statPoints: { hp: 0, def: 0, spd: 0 },
   defenderHasHeldItem: true,
   attackerNature: 'Modest',
-  attackerStatPoints: { atk: 0, spa: 32 },
+  attackerStatPoints: { atk: 0, spa: 0 },
   attackerBoostStage: 0,
   attackerItem: NO_OFFENSE_ITEM_ID,
   attackerDirectMultiplier: 1,
@@ -135,12 +135,12 @@ const INITIAL_DEFENSE: DefenseConfig = {
 const INITIAL_SPEED: SpeedConfig = {
   pokemon: '리자몽',
   nature: 'Timid',
-  statPoints: { spe: 32 },
+  statPoints: { spe: 0 },
   boostStage: 0,
   item: NO_SPEED_ITEM_ID,
   directMultiplier: 1,
   targetNature: 'Timid',
-  targetStatPoints: { spe: 32 },
+  targetStatPoints: { spe: 0 },
   targetBoostStage: 0,
   targetItem: NO_SPEED_ITEM_ID,
   targetDirectMultiplier: 1,
@@ -149,11 +149,7 @@ const INITIAL_SPEED: SpeedConfig = {
 const INITIAL_SHARED_POKEMON_BUILD: SharedPokemonBuild = {
   pokemon: '리자몽',
   nature: 'Modest',
-  statPoints: {
-    ...EMPTY_SPREAD,
-    spa: 32,
-    spe: 32,
-  },
+  statPoints: { ...EMPTY_SPREAD },
 };
 
 const INITIAL_FILTERS: FilterState = {

@@ -20,7 +20,9 @@
 
 ### 배포
 
-- 배포 예정
+- 커밋: `7ff2842 Fix Champions Mega Starmie stats`
+- GitHub Pages 배포 성공 확인
+- 배포 주소: https://jin7369.github.io/pokemon-calculator/
 
 ## 2026-06-30
 

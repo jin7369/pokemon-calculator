@@ -7,7 +7,13 @@ import type {
   SpeedSummary,
   SpeciesOption,
 } from './types';
-import { BATTLE_LEVEL, GEN, getSpeciesOption, POKEMON_OPTIONS } from './pokemonData';
+import {
+  BATTLE_LEVEL,
+  GEN,
+  getSpeciesCalcOverrides,
+  getSpeciesOption,
+  POKEMON_OPTIONS,
+} from './pokemonData';
 import { statPointsToEvs } from './statPoints';
 import { speedItemMultiplier } from './speedItems';
 
@@ -78,6 +84,7 @@ export function sortSpeedResults(results: SpeedResult[], sortKey: SpeedSortKey):
 
 function speedStatForSpecies(speciesName: string, nature: string, speedPoints: number): number {
   const pokemon = new Pokemon(GEN, speciesName, {
+    overrides: getSpeciesCalcOverrides(speciesName),
     level: BATTLE_LEVEL,
     nature,
     evs: statPointsToEvs({ spe: speedPoints }),

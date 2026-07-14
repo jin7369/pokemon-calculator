@@ -112,6 +112,32 @@ describe('damage helpers', () => {
     expect(enabled.maxDamage).toBeGreaterThan(disabled.maxDamage);
   });
 
+  it('calculates Mega Starmie with its Champions Attack stat and Huge Power', () => {
+    const charizard = getSpeciesOption('Charizard');
+    const attack: AttackConfig = {
+      attacker: 'Starmie-Mega',
+      move: 'Liquidation',
+      item: 'none',
+      ability: 'Huge Power',
+      abilityEnabled: false,
+      hitCount: 'auto',
+      nature: 'Serious',
+      attackStatPoints: { atk: 0, spa: 0 },
+      boostStage: 0,
+      directMultiplier: 1,
+    };
+
+    const disabled = calculateAttackResults(attack, neutralBulk, charizard ? [charizard] : []).results[0];
+    const enabled = calculateAttackResults(
+      { ...attack, abilityEnabled: true },
+      neutralBulk,
+      charizard ? [charizard] : [],
+    ).results[0];
+
+    expect([disabled.minDamage, disabled.maxDamage]).toEqual([116, 140]);
+    expect([enabled.minDamage, enabled.maxDamage]).toEqual([236, 278]);
+  });
+
   it('uses a manually selected hit count for variable multi-hit moves', () => {
     const charizard = getSpeciesOption('Charizard');
     const attack: AttackConfig = {

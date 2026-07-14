@@ -40,6 +40,21 @@ describe('pokemon Korean display names', () => {
     expect(getSpeciesOption('Charizard')?.abilities).toContain('Solar Power');
   });
 
+  it('uses Pokemon Champions base stats for Mega Starmie', () => {
+    const megaStarmie = getSpeciesOption('Starmie-Mega');
+
+    expect(megaStarmie?.baseStats).toEqual({
+      hp: 60,
+      atk: 100,
+      def: 105,
+      spa: 130,
+      spd: 105,
+      spe: 120,
+    });
+    expect(megaStarmie?.abilities).toContain('Huge Power');
+    expect(Object.values(megaStarmie?.baseStats ?? {}).reduce((sum, stat) => sum + stat, 0)).toBe(620);
+  });
+
   it('disambiguates localized form names that would otherwise collide', () => {
     expect(displayNameForSpecies('Kommo-o')).toBe('짜랑고우거');
     expect(getSpeciesOption('Kommo-o')?.displayName).toBe('짜랑고우거');

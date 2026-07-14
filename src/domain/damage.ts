@@ -12,7 +12,14 @@ import type {
   StatKey,
   SurvivalCategory,
 } from './types';
-import { BATTLE_LEVEL, GEN, getMoveOption, getSpeciesOption, POKEMON_OPTIONS } from './pokemonData';
+import {
+  BATTLE_LEVEL,
+  GEN,
+  getMoveOption,
+  getSpeciesCalcOverrides,
+  getSpeciesOption,
+  POKEMON_OPTIONS,
+} from './pokemonData';
 import { combinedAttackMultiplier } from './offenseItems';
 import { resolveAttackHitCount } from './multiHit';
 import { statPointsToEvs } from './statPoints';
@@ -110,6 +117,7 @@ export function calculateAttackResults(
     hits: resolvedHitCount?.hits,
   });
   const attacker = new Pokemon(GEN, attack.attacker, {
+    overrides: getSpeciesCalcOverrides(attack.attacker),
     level: BATTLE_LEVEL,
     ability: attackerAbility,
     nature: attack.nature,
@@ -122,6 +130,7 @@ export function calculateAttackResults(
   for (const target of targets) {
     try {
       const defender = new Pokemon(GEN, target.name, {
+        overrides: getSpeciesCalcOverrides(target.name),
         level: BATTLE_LEVEL,
         ability: NO_ABILITY,
         item: defenderBulk.targetHasHeldItem ? NEUTRAL_HELD_ITEM : undefined,
@@ -186,6 +195,7 @@ export function calculateDefenseResults(
     hits: resolvedHitCount?.hits,
   });
   const defender = new Pokemon(GEN, defenderOption.name, {
+    overrides: getSpeciesCalcOverrides(defenderOption.name),
     level: BATTLE_LEVEL,
     ability: NO_ABILITY,
     item: defense.defenderHasHeldItem ? NEUTRAL_HELD_ITEM : undefined,
@@ -199,6 +209,7 @@ export function calculateDefenseResults(
   for (const attackerOption of attackers) {
     try {
       const attacker = new Pokemon(GEN, attackerOption.name, {
+        overrides: getSpeciesCalcOverrides(attackerOption.name),
         level: BATTLE_LEVEL,
         ability: NO_ABILITY,
         nature: defense.attackerNature,

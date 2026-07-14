@@ -4,6 +4,10 @@ import { MOVE_NAME_OVERRIDES } from '../data/moveNameOverrides';
 import { POKEMON_KOREAN_NAMES } from '../data/pokemonKoreanNames';
 import { CHAMPIONS_CURRENT_RULESET } from '../data/championsRulesets';
 import { CHAMPIONS_ATTACK_MOVE_IDS } from '../data/championsAttackMoves';
+import {
+  CHAMPIONS_SPECIES_OVERRIDES,
+  type ChampionsSpeciesOverride,
+} from '../data/championsSpeciesOverrides';
 import { LEARNABLE_ATTACK_MOVE_IDS_BY_SPECIES } from '../data/learnableAttackMoves';
 import { POKEMON_ABILITY_NAMES_BY_SPECIES } from '../data/pokemonAbilities';
 import type { StatKey, SpeciesOption, MoveOption, MoveCategory, MoveMultiHitOption, NatureStatKey } from './types';
@@ -96,7 +100,23 @@ function multiHitOptionForMove(move: CalcMove): MoveMultiHitOption | undefined {
   };
 }
 
-const ALL_SPECIES = Array.from(GEN.species).map((species) => species as CalcSpecies);
+export function getSpeciesCalcOverrides(name: string): ChampionsSpeciesOverride | undefined {
+  return CHAMPIONS_SPECIES_OVERRIDES[name as keyof typeof CHAMPIONS_SPECIES_OVERRIDES];
+}
+
+function applyChampionsSpeciesOverride(species: CalcSpecies): CalcSpecies {
+  const override = getSpeciesCalcOverrides(species.name);
+  if (!override?.baseStats) return species;
+
+  return {
+    ...species,
+    baseStats: { ...species.baseStats, ...override.baseStats },
+  };
+}
+
+const ALL_SPECIES = Array.from(GEN.species)
+  .map((species) => species as CalcSpecies)
+  .map(applyChampionsSpeciesOverride);
 const speciesDataByName = new Map(ALL_SPECIES.map((species) => [species.name, species]));
 const championsBaseSpecies = new Set(POKEMON_RULESET.baseSpecies);
 const championsSelectableSpecies = new Set([

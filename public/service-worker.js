@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pokemon-calculator-v2';
+const CACHE_NAME = 'pokemon-calculator-v3';
 const APP_SHELL = [
   './',
   './index.html',

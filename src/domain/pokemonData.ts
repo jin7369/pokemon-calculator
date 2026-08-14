@@ -10,6 +10,7 @@ import {
 } from '../data/championsSpeciesOverrides';
 import { LEARNABLE_ATTACK_MOVE_IDS_BY_SPECIES } from '../data/learnableAttackMoves';
 import { POKEMON_ABILITY_NAMES_BY_SPECIES } from '../data/pokemonAbilities';
+import { ABILITY_KOREAN_NAMES } from '../data/abilityKoreanNames';
 import type { StatKey, SpeciesOption, MoveOption, MoveCategory, MoveMultiHitOption, NatureStatKey } from './types';
 import { STAT_LABELS } from './types';
 
@@ -163,6 +164,10 @@ export function displayNameForSpecies(name: string): string {
 
 export function displayNameForMove(name: string): string {
   return koreanMoveNameFor(name);
+}
+
+export function displayNameForAbility(name: string): string {
+  return ABILITY_KOREAN_NAMES[name] ?? name;
 }
 
 function disambiguateDuplicateSpeciesDisplayNames(options: SpeciesOption[]): SpeciesOption[] {

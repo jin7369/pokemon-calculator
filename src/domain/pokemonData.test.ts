@@ -1,5 +1,6 @@
 ﻿import { describe, expect, it } from 'vitest';
 import {
+  displayNameForAbility,
   displayNameForMove,
   displayNameForSpecies,
   getMoveOption,
@@ -38,6 +39,12 @@ describe('pokemon Korean display names', () => {
   it('stores selectable abilities on species options', () => {
     expect(getSpeciesOption('Charizard')?.abilities).toContain('Blaze');
     expect(getSpeciesOption('Charizard')?.abilities).toContain('Solar Power');
+  });
+
+  it('displays stored ability identifiers in Korean', () => {
+    expect(displayNameForAbility('Blaze')).toBe('맹화');
+    expect(displayNameForAbility('Eelevate')).toBe('천정부지');
+    expect(displayNameForAbility('Fire Mane')).toBe('불꽃갈기');
   });
 
   it('uses Pokemon Champions base stats for Mega Starmie', () => {

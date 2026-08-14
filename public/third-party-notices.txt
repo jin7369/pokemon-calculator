@@ -43,3 +43,7 @@ including Nintendo, Creatures Inc., GAME FREAK inc., and The Pokemon Company.
 This project is not affiliated with, endorsed by, or sponsored by those rights
 holders.
 
+Localized Pokemon, move, and Ability names are generated from PokeAPI data and
+stored in the application bundle. PokeAPI is an independent community project;
+the underlying Pokemon names and game data remain subject to the trademark
+notice above.

@@ -10,6 +10,13 @@ Pokemon Champions 기준의 웹 기반 배틀 스탯 계산기입니다.
 
 ## 주요 기능
 
+- 샘플 비교 워크스페이스
+  - 포켓몬, 성격, 6개 Stat Points, 특성, 지닌 도구, 공격 기술 4개를 하나의 샘플로 저장합니다.
+  - 저장된 여러 상대 샘플을 벤치마크로 고정해 양방향 데미지, 생존 판정, 스피드 차이를 비교합니다.
+  - 확정 KO, 확정 생존, 추월에 필요한 최소 Stat Points를 현재 배분 추가안과 전체 재분배안으로 제시합니다.
+  - 활성 샘플은 공격, 수비, 스피드 계산기의 포켓몬·성격·Stat Points·특성·도구 기준값으로 공유됩니다.
+  - 샘플 전환 전에 저장되지 않은 변경이 있으면 저장, 변경 취소, 돌아가기를 선택할 수 있습니다.
+
 - 공통 포켓몬 빌드
   - 공격, 수비, 스피드 계산기는 하나의 선택 포켓몬, 성격, Stat Points를 공유합니다.
   - 각 탭에서 필요한 능력치만 조정해도 같은 66포인트 배분 안에서 함께 반영됩니다.
@@ -69,12 +76,13 @@ Pokemon Champions에서 포켓몬이 추가/삭제되면 우선 이 파일만 �
 
 ## 한글 이름 데이터
 
-포켓몬/기술 한글 이름은 PokeAPI에서 가져와 정적 TypeScript 파일로 저장합니다. 런타임에는 외부 API를 호출하지 않습니다.
+포켓몬/기술/특성 한글 이름은 PokeAPI에서 가져와 정적 TypeScript 파일로 저장합니다. 런타임에는 외부 API를 호출하지 않습니다.
 
 ```bash
 npm run generate:korean-names
 npm run generate:move-names
 npm run generate:abilities
+npm run generate:ability-names
 npm run generate:learnable-moves
 ```
 
@@ -82,7 +90,16 @@ PokeAPI에 없는 이름은 override 파일로 보강합니다.
 
 - 포켓몬 이름: `src/data/pokemonKoreanNames.ts`
 - 기술 이름: `src/data/moveKoreanNames.ts`
+- 특성 이름: `src/data/abilityKoreanNames.ts`
 - 수동 보강: `src/data/moveNameOverrides.ts`
+
+## 샘플 저장 범위
+
+- 샘플 라이브러리, 활성 샘플 선택, 벤치마크 선택은 브라우저 `localStorage`에 버전과 함께 저장됩니다.
+- 저장 데이터는 같은 브라우저·같은 프로필·같은 사이트 주소에서만 유지되며 기기나 브라우저 간에 동기화되지 않습니다.
+- 시크릿 모드 종료, 브라우저 사이트 데이터 삭제, 저장 공간 정리 시 샘플이 삭제될 수 있습니다.
+- 손상되거나 지원하지 않는 버전의 데이터는 검증 후 기본 샘플로 복구하며 화면에 경고를 표시합니다.
+- 현재 기능 브랜치에는 파일 내보내기나 계정 기반 클라우드 백업이 포함되어 있지 않습니다.
 
 ## 로컬 실행
 
@@ -137,6 +154,8 @@ PWA 관련 파일:
 - `src/registerServiceWorker.ts`
 
 GitHub Pages 배포 주소는 HTTPS이므로 모바일 브라우저에서 홈 화면 추가/PWA 설치가 가능합니다.
+
+`feature/next-implementation` 브랜치의 샘플 비교 기능은 검토용이며, 별도 승인 전까지 `main` 및 위 GitHub Pages 주소에는 배포하지 않습니다.
 
 ## 라이선스 고지
 

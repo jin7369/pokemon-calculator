@@ -60,6 +60,9 @@ export interface DefenseConfig {
   nature: string;
   statPoints: Pick<StatPointSpread, 'hp' | 'def' | 'spd'>;
   defenderHasHeldItem: boolean;
+  defenderAbility?: string;
+  defenderAbilityEnabled?: boolean;
+  defenderItem?: string;
   attackerNature: string;
   attackerStatPoints: Pick<StatPointSpread, 'atk' | 'spa'>;
   attackerBoostStage: number;

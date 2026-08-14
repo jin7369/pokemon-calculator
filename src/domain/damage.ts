@@ -23,6 +23,8 @@ import {
 import { combinedAttackMultiplier } from './offenseItems';
 import { resolveAttackHitCount } from './multiHit';
 import { statPointsToEvs } from './statPoints';
+import { getBattleItemOption } from './battleItems';
+import { championsAbilityGrantsImmunity, championsMoveAbilityEffect } from './championsAbilityEffects';
 
 const EMPTY_BOOSTS: StatsTable = {
   hp: 0,
@@ -105,7 +107,9 @@ export function calculateAttackResults(
   if (!moveOption) return { results: [], summary: summarizeResults([]) };
 
   const offensiveStat = offensiveStatForCategory(moveOption.category);
-  const finalMultiplier = combinedAttackMultiplier(attack.item, moveOption, attack.directMultiplier);
+  const abilityEffect = championsMoveAbilityEffect(attack.ability, attack.abilityEnabled, moveOption);
+  const finalMultiplier = combinedAttackMultiplier(attack.item, moveOption, attack.directMultiplier)
+    * abilityEffect.multiplier;
   const attackerAbility = attack.abilityEnabled && attack.ability ? attack.ability : NO_ABILITY;
   const resolvedHitCount = resolveAttackHitCount(attack, moveOption);
   const attackerEvs = statPointsToEvs({
@@ -116,6 +120,8 @@ export function calculateAttackResults(
     ability: attackerAbility,
     hits: resolvedHitCount?.hits,
   });
+  if (abilityEffect.overrides?.basePower !== undefined) move.bp = abilityEffect.overrides.basePower;
+  if (abilityEffect.overrides?.type) move.type = abilityEffect.overrides.type as typeof move.type;
   const attacker = new Pokemon(GEN, attack.attacker, {
     overrides: getSpeciesCalcOverrides(attack.attacker),
     level: BATTLE_LEVEL,
@@ -190,6 +196,12 @@ export function calculateDefenseResults(
     [offensiveStat]: defense.attackerStatPoints[offensiveStat],
   });
   const defenderEvs = statPointsToEvs(defense.statPoints);
+  const defenderAbility = defense.defenderAbilityEnabled && defense.defenderAbility
+    ? defense.defenderAbility
+    : NO_ABILITY;
+  const defenderHasHeldItem = defense.defenderItem
+    ? getBattleItemOption(defense.defenderItem).held
+    : defense.defenderHasHeldItem;
   const move = new Move(GEN, moveOption.name, {
     ability: NO_ABILITY,
     hits: resolvedHitCount?.hits,
@@ -197,8 +209,8 @@ export function calculateDefenseResults(
   const defender = new Pokemon(GEN, defenderOption.name, {
     overrides: getSpeciesCalcOverrides(defenderOption.name),
     level: BATTLE_LEVEL,
-    ability: NO_ABILITY,
-    item: defense.defenderHasHeldItem ? NEUTRAL_HELD_ITEM : undefined,
+    ability: defenderAbility,
+    item: defenderHasHeldItem ? NEUTRAL_HELD_ITEM : undefined,
     nature: defense.nature,
     evs: defenderEvs,
   });
@@ -216,7 +228,13 @@ export function calculateDefenseResults(
         evs: attackerEvs,
         boosts: buildBoosts(offensiveStat, defense.attackerBoostStage),
       });
-      const rawRange = calculate(GEN, attacker, defender, move).range();
+      const rawRange: [number, number] = championsAbilityGrantsImmunity(
+        defenderAbility,
+        defense.defenderAbilityEnabled ?? false,
+        moveOption,
+      )
+        ? [0, 0]
+        : calculate(GEN, attacker, defender, move).range();
       const [minDamage, maxDamage] = applyDirectMultiplier(rawRange, finalMultiplier);
       const minPercent = hp > 0 ? (minDamage / hp) * 100 : 0;
       const maxPercent = hp > 0 ? (maxDamage / hp) * 100 : 0;

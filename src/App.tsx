@@ -1,5 +1,21 @@
 ﻿import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Gauge, Search, Shield, SlidersHorizontal, Swords } from 'lucide-react';
+import {
+  BookOpen,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  Gauge,
+  Pin,
+  Plus,
+  Save,
+  Search,
+  Shield,
+  SlidersHorizontal,
+  Swords,
+  Trash2,
+  X,
+} from 'lucide-react';
 import './App.css';
 import {
   CATEGORY_LABELS,
@@ -20,7 +36,6 @@ import {
   type SpeciesOption,
   type SortKey,
   type StatKey,
-  type StatPointSpread,
   type SurvivalCategory,
 } from './domain/types';
 import {
@@ -31,6 +46,7 @@ import {
   getMoveOption,
   getSpeciesOption,
   getSpeciesOptionsThatLearnMove,
+  displayNameForAbility,
   natureModifiersForName,
   natureNameForModifiers,
   resolveMoveName,
@@ -76,16 +92,37 @@ import {
   calculateBattleStats,
   calculatePerStatMaximumStats,
 } from './domain/battleStats';
+import {
+  BATTLE_ITEM_OPTIONS,
+  MEGA_STONE_ITEM_ID,
+  battleItemOffenseMultiplier,
+  getBattleItemOption,
+} from './domain/battleItems';
+import {
+  SAMPLE_MOVE_SLOT_COUNT,
+  SAMPLE_STORAGE_VERSION,
+  createDefaultBattleSample,
+  createSampleId,
+  loadSampleLibrary,
+  normalizeSampleForSpecies,
+  samplesEqual,
+  sanitizeBattleSample,
+  saveSampleLibrary,
+  type BattleSample,
+  type SampleLibraryData,
+} from './domain/battleSamples';
+import {
+  calculateSampleMatchup,
+  type DefensePointRecommendation,
+  type SampleMatchupResult,
+  type SingleStatPointRecommendation,
+} from './domain/sampleComparison';
 
-type TabKey = 'attack' | 'defense' | 'speed';
+type TabKey = 'compare' | 'attack' | 'defense' | 'speed';
 
 type FilterState = Record<SurvivalCategory, boolean>;
 type SpeedFilterState = Record<SpeedCategory, boolean>;
-type SharedPokemonBuild = {
-  pokemon: string;
-  nature: string;
-  statPoints: StatPointSpread;
-};
+type PendingSampleAction = { type: 'switch'; sampleId: string } | { type: 'new' };
 
 const DIRECT_MULTIPLIERS = [0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4];
 const SPEED_DIRECT_MULTIPLIERS = [0.25, 0.5, 1, 1.5, 2, 4];
@@ -146,12 +183,6 @@ const INITIAL_SPEED: SpeedConfig = {
   targetDirectMultiplier: 1,
 };
 
-const INITIAL_SHARED_POKEMON_BUILD: SharedPokemonBuild = {
-  pokemon: '리자몽',
-  nature: 'Modest',
-  statPoints: { ...EMPTY_SPREAD },
-};
-
 const INITIAL_FILTERS: FilterState = {
   survives: true,
   roll: true,
@@ -165,6 +196,7 @@ const INITIAL_SPEED_FILTERS: SpeedFilterState = {
 };
 
 const TABS: Array<{ key: TabKey; label: string; icon: typeof Swords }> = [
+  { key: 'compare', label: '샘플 비교', icon: BookOpen },
   { key: 'attack', label: '공격', icon: Swords },
   { key: 'defense', label: '수비', icon: Shield },
   { key: 'speed', label: '스피드', icon: Gauge },
@@ -742,12 +774,160 @@ function BaseStatsTable({
   );
 }
 
+function SingleStatRecommendationView({
+  recommendation,
+  goal,
+}: {
+  recommendation: SingleStatPointRecommendation;
+  goal: string;
+}) {
+  const label = STAT_LABELS[recommendation.stat];
+  const currentText = recommendation.currentAddRequired === null
+    ? '현재 배분에서 달성 불가'
+    : recommendation.currentAddRequired === recommendation.currentPoints
+      ? `현재 ${recommendation.currentPoints}P로 충족`
+      : `${label} ${recommendation.currentAddRequired}P (+${recommendation.currentAddRequired - recommendation.currentPoints}P)`;
+  const redistributionText = recommendation.redistributedRequired === null
+    ? '32P에서도 달성 불가'
+    : `${label} ${recommendation.redistributedRequired}P${recommendation.pointsToReallocate > 0 ? ` · ${recommendation.pointsToReallocate}P 재배분` : ''}`;
+
+  return (
+    <div className="recommendation-block">
+      <strong>{goal}</strong>
+      <span>현재안: {currentText}</span>
+      <span>재배분안: {redistributionText}</span>
+    </div>
+  );
+}
+
+function formatDefenseOption(option: DefensePointRecommendation['redistributedOptions'][number], stat: 'def' | 'spd') {
+  return `HP ${option.hp}P + ${STAT_LABELS[stat]} ${option.bulk}P${option.pointsToReallocate > 0 ? ` (${option.pointsToReallocate}P 재배분)` : ''}`;
+}
+
+function DefenseRecommendationView({
+  recommendation,
+  goal = '확정 생존 최소 SP',
+}: {
+  recommendation: DefensePointRecommendation;
+  goal?: string;
+}) {
+  const currentText = recommendation.currentAddOptions.length > 0
+    ? recommendation.currentAddOptions.map((option) => formatDefenseOption(option, recommendation.stat)).join(' / ')
+    : '현재 배분에서 달성 불가';
+  const redistributedText = recommendation.redistributedOptions.length > 0
+    ? recommendation.redistributedOptions.map((option) => formatDefenseOption(option, recommendation.stat)).join(' / ')
+    : `32P 최대 투자에서도 ${formatPercent(recommendation.maximumInvestment.maxPercent)}`;
+
+  return (
+    <div className="recommendation-block">
+      <strong>{goal}</strong>
+      <span>현재안: {currentText}</span>
+      <span>재배분안: {redistributedText}</span>
+    </div>
+  );
+}
+
+function SampleMatchupCard({ result }: { result: SampleMatchupResult }) {
+  const benchmarkSpecies = getSpeciesOption(result.benchmark.species);
+  const strongest = result.strongestOutgoing;
+  const dangerous = result.mostDangerousIncoming;
+
+  return (
+    <article className="matchup-card">
+      <div className="matchup-card__header">
+        <div>
+          <span className="sample-kicker">BENCHMARK</span>
+          <h3>{result.benchmark.name}</h3>
+          <small>{benchmarkSpecies?.displayName ?? result.benchmark.species} · {result.benchmark.nature} · {totalStatPoints(result.benchmark.statPoints)}/66P</small>
+        </div>
+        <div className="type-list">
+          {benchmarkSpecies?.types.map((type) => <TypeBadge key={type} type={type} />)}
+        </div>
+      </div>
+
+      <div className="matchup-summary-grid">
+        <div>
+          <span>내 최고 화력</span>
+          <strong>{strongest?.damage.move.displayName ?? '공격 기술 없음'}</strong>
+          <small>{strongest ? `${formatPercent(strongest.damage.minPercent)}-${formatPercent(strongest.damage.maxPercent)} · ${CATEGORY_LABELS[strongest.damage.category]}` : '-'}</small>
+        </div>
+        <div>
+          <span>최대 위협</span>
+          <strong>{dangerous?.damage.move.displayName ?? '공격 기술 없음'}</strong>
+          <small>{dangerous ? `${formatPercent(dangerous.damage.minPercent)}-${formatPercent(dangerous.damage.maxPercent)} · ${CATEGORY_LABELS[dangerous.damage.category]}` : '-'}</small>
+        </div>
+        <div>
+          <span>스피드</span>
+          <strong>{SPEED_CATEGORY_LABELS[result.speed.category]}</strong>
+          <small>{result.speed.selfFinalSpeed} : {result.speed.targetFinalSpeed} ({formatSpeedMargin(result.speed.margin)})</small>
+        </div>
+      </div>
+
+      <div className="matchup-recommendations">
+        {strongest ? (
+          <SingleStatRecommendationView
+            recommendation={strongest.recommendation}
+            goal="최고 기술 확정 KO 최소 SP"
+          />
+        ) : null}
+        {dangerous ? (
+          <DefenseRecommendationView
+            recommendation={dangerous.recommendation}
+            goal="최대 위협 확정 생존 최소 SP"
+          />
+        ) : null}
+        <SingleStatRecommendationView recommendation={result.speed.recommendation} goal="추월 최소 SP" />
+      </div>
+
+      <details className="matchup-details">
+        <summary>기술별 상세 비교</summary>
+        <div className="matchup-details__section">
+          <h4>내가 주는 피해</h4>
+          {result.outgoing.length > 0 ? result.outgoing.map(({ damage, recommendation }) => (
+            <div className="move-comparison" key={`out-${damage.move.id}`}>
+              <div className="move-comparison__result">
+                <strong>{damage.move.displayName}</strong>
+                <span>{damage.minDamage}-{damage.maxDamage}</span>
+                <span>{formatPercent(damage.minPercent)}-{formatPercent(damage.maxPercent)}</span>
+                <span className={`verdict verdict--${damage.category}`}>{CATEGORY_LABELS[damage.category]}</span>
+              </div>
+              <SingleStatRecommendationView recommendation={recommendation} goal="확정 KO 최소 SP" />
+            </div>
+          )) : <div className="invalid-state">저장된 공격 기술이 없습니다.</div>}
+        </div>
+
+        <div className="matchup-details__section">
+          <h4>내가 받는 피해</h4>
+          {result.incoming.length > 0 ? result.incoming.map(({ damage, recommendation }) => (
+            <div className="move-comparison" key={`in-${damage.move.id}`}>
+              <div className="move-comparison__result">
+                <strong>{damage.move.displayName}</strong>
+                <span>{damage.minDamage}-{damage.maxDamage}</span>
+                <span>{formatPercent(damage.minPercent)}-{formatPercent(damage.maxPercent)}</span>
+                <span className={`verdict verdict--${damage.category}`}>{CATEGORY_LABELS[damage.category]}</span>
+              </div>
+              <DefenseRecommendationView recommendation={recommendation} />
+            </div>
+          )) : <div className="invalid-state">상대에게 저장된 공격 기술이 없습니다.</div>}
+        </div>
+      </details>
+    </article>
+  );
+}
+
 function App() {
-  const [activeTab, setActiveTab] = useState<TabKey>('attack');
+  const [initialSampleStorage] = useState(() => loadSampleLibrary(window.localStorage));
+  const [sampleLibrary, setSampleLibrary] = useState<SampleLibraryData>(initialSampleStorage.data);
+  const [sampleDraft, setSampleDraft] = useState<BattleSample>(() => (
+    initialSampleStorage.data.samples.find((sample) => sample.id === initialSampleStorage.data.activeSampleId)
+      ?? initialSampleStorage.data.samples[0]
+  ));
+  const [storageWarning, setStorageWarning] = useState<string | null>(initialSampleStorage.warning);
+  const [pendingSampleAction, setPendingSampleAction] = useState<PendingSampleAction | null>(null);
+  const [activeTab, setActiveTab] = useState<TabKey>('compare');
   const [attack, setAttack] = useState<AttackConfig>(INITIAL_ATTACK);
   const [defense, setDefense] = useState<DefenseConfig>(INITIAL_DEFENSE);
   const [speed, setSpeed] = useState<SpeedConfig>(INITIAL_SPEED);
-  const [sharedPokemonBuild, setSharedPokemonBuild] = useState<SharedPokemonBuild>(INITIAL_SHARED_POKEMON_BUILD);
   const [defenderBulk, setDefenderBulk] = useState<DefenderBulkConfig>(INITIAL_DEFENDER_BULK);
   const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS);
   const [targetSearch, setTargetSearch] = useState('');
@@ -765,28 +945,57 @@ function App() {
   const debouncedAttack = useDebouncedValue(attack, INPUT_DEBOUNCE_MS);
   const debouncedDefense = useDebouncedValue(defense, INPUT_DEBOUNCE_MS);
   const debouncedSpeed = useDebouncedValue(speed, INPUT_DEBOUNCE_MS);
-  const debouncedSharedPokemonBuild = useDebouncedValue(sharedPokemonBuild, INPUT_DEBOUNCE_MS);
+  const debouncedSampleDraft = useDebouncedValue(sampleDraft, INPUT_DEBOUNCE_MS);
   const debouncedDefenderBulk = useDebouncedValue(defenderBulk, INPUT_DEBOUNCE_MS);
   const debouncedTargetSearch = useDebouncedValue(targetSearch, SEARCH_DEBOUNCE_MS);
   const debouncedDefenseSearch = useDebouncedValue(defenseSearch, SEARCH_DEBOUNCE_MS);
   const debouncedSpeedSearch = useDebouncedValue(speedSearch, SEARCH_DEBOUNCE_MS);
 
-  const selectedSharedPokemon = resolveSpeciesName(sharedPokemonBuild.pokemon);
+  const activeSavedSample = sampleLibrary.samples.find((sample) => sample.id === sampleDraft.id) ?? null;
+  const isSampleDirty = !activeSavedSample || !samplesEqual(sampleDraft, activeSavedSample);
+  const sharedPokemonBuild = useMemo(() => ({
+    pokemon: sampleDraft.species,
+    nature: sampleDraft.nature,
+    statPoints: sampleDraft.statPoints,
+  }), [sampleDraft]);
+  const debouncedSharedPokemonBuild = useMemo(() => ({
+    pokemon: debouncedSampleDraft.species,
+    nature: debouncedSampleDraft.nature,
+    statPoints: debouncedSampleDraft.statPoints,
+  }), [debouncedSampleDraft]);
+  const selectedSharedPokemon = resolveSpeciesName(sampleDraft.species);
   const selectedSharedPokemonOption = selectedSharedPokemon ? getSpeciesOption(selectedSharedPokemon) : null;
   const selectedAttacker = selectedSharedPokemon;
   const selectedAttackerAbilities = selectedSharedPokemonOption?.abilities ?? EMPTY_ABILITY_OPTIONS;
   const selectedAttackerMoveOptions = useMemo(
-    () => getLearnableAttackMoveOptionsForSpecies(selectedAttacker),
-    [selectedAttacker],
+    () => {
+      const options = getLearnableAttackMoveOptionsForSpecies(selectedAttacker);
+      const priority = new Map(sampleDraft.moves.map((move, index) => [move, index]));
+      return [...options].sort((left, right) => {
+        const leftPriority = priority.get(left.name);
+        const rightPriority = priority.get(right.name);
+        if (leftPriority !== undefined && rightPriority !== undefined) return leftPriority - rightPriority;
+        if (leftPriority !== undefined) return -1;
+        if (rightPriority !== undefined) return 1;
+        return left.displayName.localeCompare(right.displayName, 'ko');
+      });
+    },
+    [selectedAttacker, sampleDraft.moves],
   );
   const selectedMoveName = resolveMoveName(attack.move);
   const selectedMove = selectedMoveName ? getMoveOption(selectedMoveName) : null;
   const selectedMoveIsLearnable = selectedAttackerMoveOptions.some((move) => move.name === selectedMoveName);
   const selectedLearnableMove = selectedMoveIsLearnable ? selectedMove : null;
-  const selectedHitCount = resolveAttackHitCount(attack, selectedLearnableMove);
-  const selectedItem = getOffenseItemOption(attack.item);
-  const itemMultiplier = offenseItemMultiplierForMove(attack.item, selectedLearnableMove);
-  const finalAttackMultiplier = combinedAttackMultiplier(attack.item, selectedLearnableMove, attack.directMultiplier);
+  const sampleAttackConfig = useMemo(() => ({
+    ...attack,
+    item: sampleDraft.item,
+    ability: sampleDraft.ability,
+    abilityEnabled: sampleDraft.abilityEnabled,
+  }), [attack, sampleDraft.item, sampleDraft.ability, sampleDraft.abilityEnabled]);
+  const selectedHitCount = resolveAttackHitCount(sampleAttackConfig, selectedLearnableMove);
+  const selectedItem = getBattleItemOption(sampleDraft.item);
+  const itemMultiplier = battleItemOffenseMultiplier(sampleDraft.item, selectedLearnableMove);
+  const finalAttackMultiplier = itemMultiplier * attack.directMultiplier;
   const activeAttackStat = selectedLearnableMove ? offensiveStatForCategory(selectedLearnableMove.category) : 'spa';
 
   const selectedDefenseDefender = selectedSharedPokemon;
@@ -811,10 +1020,26 @@ function App() {
   const activeDefenseAttackStat = selectedDefenseMove ? offensiveStatForCategory(selectedDefenseMove.category) : 'spa';
   const activeDefenseBulkStat = selectedDefenseMove ? defensiveStatForCategory(selectedDefenseMove.category) : 'spd';
 
-  const selectedSpeedItem = getSpeedItemOption(speed.item);
+  const selectedSpeedItem = getBattleItemOption(sampleDraft.item);
   const selectedTargetSpeedItem = getSpeedItemOption(speed.targetItem);
-  const finalSpeedMultiplier = selectedSpeedItem.multiplier * speed.directMultiplier;
+  const finalSpeedMultiplier = selectedSpeedItem.speedMultiplier * speed.directMultiplier;
   const finalTargetSpeedMultiplier = selectedTargetSpeedItem.multiplier * speed.targetDirectMultiplier;
+
+  const benchmarkSamples = useMemo(
+    () => sampleLibrary.benchmarkIds
+      .map((id) => sampleLibrary.samples.find((sample) => sample.id === id))
+      .filter((sample): sample is BattleSample => Boolean(sample && sample.id !== sampleDraft.id)),
+    [sampleLibrary.benchmarkIds, sampleLibrary.samples, sampleDraft.id],
+  );
+  const sampleMatchups = useMemo(
+    () => benchmarkSamples.map((benchmark) => calculateSampleMatchup(debouncedSampleDraft, benchmark)),
+    [benchmarkSamples, debouncedSampleDraft],
+  );
+
+  useEffect(() => {
+    const warning = saveSampleLibrary(window.localStorage, sampleLibrary);
+    if (warning) setStorageWarning(warning);
+  }, [sampleLibrary]);
 
   useEffect(() => {
     if (!selectedAttacker || selectedAttackerMoveOptions.length === 0) return;
@@ -828,18 +1053,6 @@ function App() {
       move: selectedAttackerMoveOptions[0].displayName,
     }));
   }, [attack.move, selectedAttacker, selectedAttackerMoveOptions]);
-
-  useEffect(() => {
-    setAttack((current) => {
-      if (selectedAttackerAbilities.length === 0) {
-        if (current.ability === '' && !current.abilityEnabled) return current;
-        return { ...current, ability: '', abilityEnabled: false };
-      }
-
-      if (selectedAttackerAbilities.includes(current.ability)) return current;
-      return { ...current, ability: selectedAttackerAbilities[0] };
-    });
-  }, [selectedAttackerAbilities]);
 
   useEffect(() => {
     if (attack.hitCount === 'auto') return;
@@ -869,13 +1082,16 @@ function App() {
       ...debouncedAttack,
       attacker: calculationAttacker,
       move: calculationMove,
+      item: debouncedSampleDraft.item,
+      ability: debouncedSampleDraft.ability,
+      abilityEnabled: debouncedSampleDraft.abilityEnabled,
       nature: debouncedSharedPokemonBuild.nature,
       attackStatPoints: {
         atk: debouncedSharedPokemonBuild.statPoints.atk,
         spa: debouncedSharedPokemonBuild.statPoints.spa,
       },
     };
-  }, [debouncedAttack, debouncedSharedPokemonBuild]);
+  }, [debouncedAttack, debouncedSampleDraft, debouncedSharedPokemonBuild]);
 
   const calculation = useMemo(() => {
     if (!calculationAttack) return { results: [], summary: { survives: 0, roll: 0, ko: 0, total: 0 } };
@@ -893,13 +1109,16 @@ function App() {
       defender: calculationDefender,
       move: calculationMove,
       nature: debouncedSharedPokemonBuild.nature,
+      defenderAbility: debouncedSampleDraft.ability,
+      defenderAbilityEnabled: debouncedSampleDraft.abilityEnabled,
+      defenderItem: debouncedSampleDraft.item,
       statPoints: {
         hp: debouncedSharedPokemonBuild.statPoints.hp,
         def: debouncedSharedPokemonBuild.statPoints.def,
         spd: debouncedSharedPokemonBuild.statPoints.spd,
       },
     };
-  }, [debouncedDefense, debouncedSharedPokemonBuild]);
+  }, [debouncedDefense, debouncedSampleDraft, debouncedSharedPokemonBuild]);
 
   const calculationDefenseAttackers = useMemo(
     () => getSpeciesOptionsThatLearnMove(calculationDefense?.move ?? null),
@@ -919,11 +1138,12 @@ function App() {
       ...debouncedSpeed,
       pokemon: calculationPokemon,
       nature: debouncedSharedPokemonBuild.nature,
+      item: debouncedSampleDraft.item,
       statPoints: {
         spe: debouncedSharedPokemonBuild.statPoints.spe,
       },
     };
-  }, [debouncedSpeed, debouncedSharedPokemonBuild]);
+  }, [debouncedSpeed, debouncedSampleDraft, debouncedSharedPokemonBuild]);
 
   const speedCalculation = useMemo(() => {
     if (!calculationSpeed) return { results: [], summary: { outspeeds: 0, tie: 0, slower: 0, total: 0 } };
@@ -1015,26 +1235,135 @@ function App() {
   const targetSpeedPointTotal = totalStatPoints(targetSpeedPointSpread);
 
   function setSharedPokemon(value: string) {
-    setSharedPokemonBuild((current) => ({
-      ...current,
-      pokemon: value,
-    }));
+    const species = resolveSpeciesName(value);
+    if (!species) return;
+    setSampleDraft((current) => normalizeSampleForSpecies(current, species));
   }
 
   function setSharedNature(value: string) {
-    setSharedPokemonBuild((current) => ({
-      ...current,
-      nature: value,
-    }));
+    setSampleDraft((current) => ({ ...current, nature: value }));
   }
 
   function setSharedStatPoint(stat: StatKey, value: number) {
-    setSharedPokemonBuild((current) => {
+    setSampleDraft((current) => {
       const next = updateStatPoint(current.statPoints, stat, value);
       return {
         ...current,
         statPoints: next,
       };
+    });
+  }
+
+  function commitSample(library: SampleLibraryData, draft: BattleSample): SampleLibraryData {
+    const normalized = sanitizeBattleSample(draft) ?? createDefaultBattleSample(draft.id);
+    const exists = library.samples.some((sample) => sample.id === normalized.id);
+    return {
+      ...library,
+      version: SAMPLE_STORAGE_VERSION,
+      samples: exists
+        ? library.samples.map((sample) => sample.id === normalized.id ? normalized : sample)
+        : [...library.samples, normalized],
+      activeSampleId: normalized.id,
+      benchmarkIds: library.benchmarkIds.filter((id) => id !== normalized.id),
+    };
+  }
+
+  function saveCurrentSample(): BattleSample {
+    const normalized = sanitizeBattleSample(sampleDraft) ?? createDefaultBattleSample(sampleDraft.id);
+    setSampleLibrary((current) => commitSample(current, normalized));
+    setSampleDraft(normalized);
+    return normalized;
+  }
+
+  function saveSampleAs(copyLabel = '새 이름'): void {
+    const normalized = sanitizeBattleSample({
+      ...sampleDraft,
+      id: createSampleId(),
+      name: `${sampleDraft.name} ${copyLabel}`.trim().slice(0, 40),
+    }) ?? createDefaultBattleSample();
+    setSampleLibrary((current) => commitSample(current, normalized));
+    setSampleDraft(normalized);
+  }
+
+  function performSampleAction(action: PendingSampleAction, library = sampleLibrary): void {
+    if (action.type === 'switch') {
+      const target = library.samples.find((sample) => sample.id === action.sampleId);
+      if (!target) return;
+      setSampleLibrary({
+        ...library,
+        activeSampleId: target.id,
+        benchmarkIds: library.benchmarkIds.filter((id) => id !== target.id),
+      });
+      setSampleDraft(target);
+      return;
+    }
+
+    setSampleDraft(createDefaultBattleSample());
+  }
+
+  function requestSampleAction(action: PendingSampleAction): void {
+    if (action.type === 'switch' && action.sampleId === sampleDraft.id) return;
+    if (isSampleDirty) {
+      setPendingSampleAction(action);
+      return;
+    }
+    performSampleAction(action);
+  }
+
+  function saveAndContinuePendingAction(): void {
+    if (!pendingSampleAction) return;
+    const normalized = sanitizeBattleSample(sampleDraft) ?? createDefaultBattleSample(sampleDraft.id);
+    const nextLibrary = commitSample(sampleLibrary, normalized);
+    setPendingSampleAction(null);
+    setSampleLibrary(nextLibrary);
+    performSampleAction(pendingSampleAction, nextLibrary);
+  }
+
+  function discardAndContinuePendingAction(): void {
+    if (!pendingSampleAction) return;
+    const action = pendingSampleAction;
+    setPendingSampleAction(null);
+    performSampleAction(action);
+  }
+
+  function deleteCurrentSample(): void {
+    const saved = sampleLibrary.samples.find((sample) => sample.id === sampleDraft.id);
+    if (!saved) {
+      const fallback = sampleLibrary.samples.find((sample) => sample.id === sampleLibrary.activeSampleId)
+        ?? sampleLibrary.samples[0];
+      if (fallback) setSampleDraft(fallback);
+      return;
+    }
+    if (!window.confirm(`'${saved.name}' 샘플을 삭제할까요?`)) return;
+
+    const remaining = sampleLibrary.samples.filter((sample) => sample.id !== saved.id);
+    const fallback = remaining[0] ?? createDefaultBattleSample();
+    setSampleLibrary({
+      ...sampleLibrary,
+      samples: remaining.length > 0 ? remaining : [fallback],
+      activeSampleId: fallback.id,
+      benchmarkIds: sampleLibrary.benchmarkIds.filter((id) => id !== saved.id),
+    });
+    setSampleDraft(fallback);
+  }
+
+  function toggleBenchmark(sampleId: string): void {
+    if (sampleId === sampleDraft.id) return;
+    setSampleLibrary((current) => ({
+      ...current,
+      benchmarkIds: current.benchmarkIds.includes(sampleId)
+        ? current.benchmarkIds.filter((id) => id !== sampleId)
+        : [...current.benchmarkIds, sampleId],
+    }));
+  }
+
+  function setSampleMove(slot: number, value: string): void {
+    const moveName = resolveMoveName(value);
+    setSampleDraft((current) => {
+      const slots = Array.from({ length: SAMPLE_MOVE_SLOT_COUNT }, (_, index) => current.moves[index] ?? '');
+      slots[slot] = moveName ?? '';
+      const moves = slots.filter((move, index) => move && slots.indexOf(move) === index);
+      return { ...current, moves };
     });
   }
 
@@ -1078,6 +1407,55 @@ function App() {
         <div className="rule-chip">싱글 · Lv50 · {POKEMON_RULESET.label} · {POKEMON_OPTIONS.length}종</div>
       </header>
 
+      {storageWarning ? (
+        <div className="storage-warning" role="alert">
+          <span>{storageWarning}</span>
+          <button type="button" aria-label="저장소 경고 닫기" onClick={() => setStorageWarning(null)}>
+            <X size={17} aria-hidden="true" />
+          </button>
+        </div>
+      ) : null}
+
+      <section className="sample-toolbar" aria-label="활성 샘플 도구 모음">
+        <label className="sample-toolbar__selector">
+          <span>활성 샘플</span>
+          <select
+            value={activeSavedSample ? sampleDraft.id : ''}
+            onChange={(event) => requestSampleAction({ type: 'switch', sampleId: event.target.value })}
+          >
+            {!activeSavedSample ? <option value="">저장되지 않은 새 샘플</option> : null}
+            {sampleLibrary.samples.map((sample) => (
+              <option key={sample.id} value={sample.id}>{sample.name}</option>
+            ))}
+          </select>
+        </label>
+        <span className={isSampleDirty ? 'save-status save-status--dirty' : 'save-status'}>
+          {isSampleDirty ? '저장되지 않은 변경' : '저장됨'}
+        </span>
+        <div className="sample-toolbar__actions">
+          <button type="button" onClick={saveCurrentSample} disabled={!isSampleDirty} title="현재 샘플 저장">
+            <Save size={17} aria-hidden="true" />
+            <span>저장</span>
+          </button>
+          <button type="button" onClick={() => saveSampleAs()} title="다른 이름으로 저장">
+            <Check size={17} aria-hidden="true" />
+            <span>다른 이름</span>
+          </button>
+          <button type="button" onClick={() => requestSampleAction({ type: 'new' })} title="새 샘플">
+            <Plus size={17} aria-hidden="true" />
+            <span>새 샘플</span>
+          </button>
+          <button type="button" onClick={() => saveSampleAs('복제')} title="현재 샘플 복제">
+            <Copy size={17} aria-hidden="true" />
+            <span>복제</span>
+          </button>
+          <button type="button" onClick={deleteCurrentSample} title="현재 샘플 삭제">
+            <Trash2 size={17} aria-hidden="true" />
+            <span>삭제</span>
+          </button>
+        </div>
+      </section>
+
       <nav className="tab-bar" aria-label="계산기 종류">
         {TABS.map(({ key, label, icon: Icon }) => (
           <button
@@ -1092,7 +1470,186 @@ function App() {
         ))}
       </nav>
 
-      {activeTab === 'attack' ? (
+      {activeTab === 'compare' ? (
+        <section className="sample-workspace" aria-label="샘플 비교">
+          <aside className="sample-editor">
+            <section className="control-section">
+              <div className="section-title">
+                <BookOpen size={18} aria-hidden="true" />
+                <h2>활성 샘플 편집</h2>
+              </div>
+
+              <label className="field-label">
+                <span>샘플명</span>
+                <input
+                  value={sampleDraft.name}
+                  maxLength={40}
+                  onChange={(event) => setSampleDraft((current) => ({ ...current, name: event.target.value }))}
+                />
+              </label>
+
+              <PokemonPicker
+                label="포켓몬"
+                value={sampleDraft.species}
+                selected={selectedSharedPokemonOption}
+                options={POKEMON_OPTIONS}
+                onChange={setSharedPokemon}
+              />
+
+              <BaseStatsTable
+                species={selectedSharedPokemonOption}
+                nature={sampleDraft.nature}
+                statPoints={sampleDraft.statPoints}
+              />
+
+              <NatureModifierPicker label="성격" value={sampleDraft.nature} onChange={setSharedNature} />
+
+              <div className="stat-block">
+                <div className="stat-block__header">
+                  <span>Stat Points</span>
+                  <strong>{sharedPointTotal}/{STAT_POINT_TOTAL_LIMIT}</strong>
+                </div>
+                {STAT_KEYS.map((stat) => (
+                  <StatPointControl
+                    key={stat}
+                    stat={stat}
+                    value={sampleDraft.statPoints[stat]}
+                    total={sharedPointTotal}
+                    onChange={(value) => setSharedStatPoint(stat, value)}
+                  />
+                ))}
+              </div>
+
+              <div className="ability-panel">
+                <label className="ability-toggle">
+                  <input
+                    type="checkbox"
+                    checked={sampleDraft.abilityEnabled}
+                    disabled={selectedAttackerAbilities.length === 0}
+                    onChange={(event) => setSampleDraft((current) => ({
+                      ...current,
+                      abilityEnabled: event.target.checked,
+                    }))}
+                  />
+                  <span>
+                    <strong>특성 적용</strong>
+                    <small>{sampleDraft.abilityEnabled && sampleDraft.ability ? displayNameForAbility(sampleDraft.ability) : 'OFF'}</small>
+                  </span>
+                </label>
+                <label className="field-label">
+                  <span>특성</span>
+                  <select
+                    value={sampleDraft.ability}
+                    disabled={selectedAttackerAbilities.length === 0}
+                    onChange={(event) => setSampleDraft((current) => ({ ...current, ability: event.target.value }))}
+                  >
+                    {selectedAttackerAbilities.length === 0 ? <option value="">선택 가능 특성 없음</option> : null}
+                    {selectedAttackerAbilities.map((ability) => (
+                      <option key={ability} value={ability}>{displayNameForAbility(ability)}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <label className="field-label">
+                <span>지닌 도구</span>
+                <select
+                  value={sampleDraft.item}
+                  disabled={sampleDraft.item === MEGA_STONE_ITEM_ID}
+                  onChange={(event) => setSampleDraft((current) => ({ ...current, item: event.target.value }))}
+                >
+                  {BATTLE_ITEM_OPTIONS
+                    .filter((item) => item.id !== MEGA_STONE_ITEM_ID || sampleDraft.item === MEGA_STONE_ITEM_ID)
+                    .map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+                </select>
+                {sampleDraft.item === MEGA_STONE_ITEM_ID ? <small>메가폼은 메가스톤 보유 상태로 고정됩니다.</small> : null}
+              </label>
+
+              <div className="sample-moves">
+                <div className="stat-block__header">
+                  <span>공격 기술</span>
+                  <strong>{sampleDraft.moves.length}/{SAMPLE_MOVE_SLOT_COUNT}</strong>
+                </div>
+                {Array.from({ length: SAMPLE_MOVE_SLOT_COUNT }, (_, slot) => {
+                  const moveName = sampleDraft.moves[slot] ?? '';
+                  const selected = moveName ? getMoveOption(moveName) : null;
+                  const usedMoves = new Set(sampleDraft.moves.filter((_, index) => index !== slot));
+                  const options = selectedAttackerMoveOptions.filter((move) => !usedMoves.has(move.name));
+                  return (
+                    <div className="sample-move-slot" key={`sample-move-${slot}`}>
+                      <MovePicker
+                        label={`기술 ${slot + 1}`}
+                        value={selected?.displayName ?? ''}
+                        selected={selected}
+                        options={options}
+                        onChange={(value) => setSampleMove(slot, value)}
+                      />
+                      <button
+                        type="button"
+                        className="icon-button"
+                        aria-label={`기술 ${slot + 1} 비우기`}
+                        title="기술 비우기"
+                        disabled={!moveName}
+                        onClick={() => setSampleMove(slot, '')}
+                      >
+                        <X size={17} aria-hidden="true" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+
+            <section className="control-section benchmark-library">
+              <div className="section-title">
+                <Pin size={18} aria-hidden="true" />
+                <h2>벤치마크 고정</h2>
+              </div>
+              <div className="benchmark-list">
+                {sampleLibrary.samples.filter((sample) => sample.id !== sampleDraft.id).length > 0 ? (
+                  sampleLibrary.samples.filter((sample) => sample.id !== sampleDraft.id).map((sample) => {
+                    const species = getSpeciesOption(sample.species);
+                    const checked = sampleLibrary.benchmarkIds.includes(sample.id);
+                    return (
+                      <label className={checked ? 'benchmark-option benchmark-option--selected' : 'benchmark-option'} key={sample.id}>
+                        <input type="checkbox" checked={checked} onChange={() => toggleBenchmark(sample.id)} />
+                        <span>
+                          <strong>{sample.name}</strong>
+                          <small>{species?.displayName ?? sample.species} · {formatNatureSummary(sample.nature)}</small>
+                        </span>
+                      </label>
+                    );
+                  })
+                ) : (
+                  <div className="benchmark-empty">비교할 저장 샘플을 추가하거나 현재 샘플을 복제하세요.</div>
+                )}
+              </div>
+            </section>
+          </aside>
+
+          <section className="sample-results">
+            <div className="results-header">
+              <div>
+                <p className="eyebrow">Sample Matchups</p>
+                <h2>벤치마크 비교</h2>
+              </div>
+              <div className="result-count">{sampleMatchups.length}개 고정</div>
+            </div>
+            <p className="comparison-condition">Lv50 · 랭크 0 · 직접 배율 1x · 각 샘플의 특성 및 도구 적용</p>
+            {sampleMatchups.length > 0 ? (
+              <div className="matchup-list">
+                {sampleMatchups.map((result) => <SampleMatchupCard key={result.benchmark.id} result={result} />)}
+              </div>
+            ) : (
+              <div className="empty-panel">
+                <Pin size={22} aria-hidden="true" />
+                <strong>고정된 벤치마크가 없습니다.</strong>
+                <span>저장된 다른 샘플을 왼쪽 목록에서 선택하세요.</span>
+              </div>
+            )}
+          </section>
+        </section>
+      ) : activeTab === 'attack' ? (
         <section className="workspace" aria-label="공격 계산기">
           <aside className="control-panel">
             <section className="control-section">
@@ -1119,28 +1676,28 @@ function App() {
                 <label className="ability-toggle">
                   <input
                     type="checkbox"
-                    checked={attack.abilityEnabled}
+                    checked={sampleDraft.abilityEnabled}
                     disabled={selectedAttackerAbilities.length === 0}
-                    onChange={(event) => setAttack((current) => ({ ...current, abilityEnabled: event.target.checked }))}
+                    onChange={(event) => setSampleDraft((current) => ({ ...current, abilityEnabled: event.target.checked }))}
                   />
                   <span>
                     <strong>공격 특성 적용</strong>
-                    <small>{attack.abilityEnabled && attack.ability ? attack.ability : 'OFF'}</small>
+                    <small>{sampleDraft.abilityEnabled && sampleDraft.ability ? displayNameForAbility(sampleDraft.ability) : 'OFF'}</small>
                   </span>
                 </label>
 
                 <label className="field-label">
                   <span>공격 특성</span>
                   <select
-                    value={attack.ability}
+                    value={sampleDraft.ability}
                     disabled={selectedAttackerAbilities.length === 0}
-                    onChange={(event) => setAttack((current) => ({ ...current, ability: event.target.value }))}
+                    onChange={(event) => setSampleDraft((current) => ({ ...current, ability: event.target.value }))}
                   >
                     {selectedAttackerAbilities.length === 0 ? (
                       <option value="">선택 가능 특성 없음</option>
                     ) : (
                       selectedAttackerAbilities.map((ability) => (
-                        <option key={ability} value={ability}>{ability}</option>
+                        <option key={ability} value={ability}>{displayNameForAbility(ability)}</option>
                       ))
                     )}
                   </select>
@@ -1183,7 +1740,7 @@ function App() {
                       >
                         <option value="auto">
                           자동 ({formatHitCountOption(resolveAttackHitCount(
-                            { ...attack, hitCount: 'auto' },
+                            { ...sampleAttackConfig, hitCount: 'auto' },
                             selectedLearnableMove,
                           )?.hits ?? selectedLearnableMove.multiHit.defaultHits)})
                         </option>
@@ -1203,12 +1760,15 @@ function App() {
               ) : null}
 
               <label className="field-label">
-                <span>화력 아이템</span>
+                <span>지닌 도구</span>
                 <select
-                  value={attack.item}
-                  onChange={(event) => setAttack((current) => ({ ...current, item: event.target.value }))}
+                  value={sampleDraft.item}
+                  disabled={sampleDraft.item === MEGA_STONE_ITEM_ID}
+                  onChange={(event) => setSampleDraft((current) => ({ ...current, item: event.target.value }))}
                 >
-                  {OFFENSE_ITEM_OPTIONS.map((item) => (
+                  {BATTLE_ITEM_OPTIONS
+                    .filter((item) => item.id !== MEGA_STONE_ITEM_ID || sampleDraft.item === MEGA_STONE_ITEM_ID)
+                    .map((item) => (
                     <option key={item.id} value={item.id}>{item.label}</option>
                   ))}
                 </select>
@@ -1473,6 +2033,47 @@ function App() {
                 statPoints={sharedPokemonBuild.statPoints}
               />
 
+              <div className="ability-panel">
+                <label className="ability-toggle">
+                  <input
+                    type="checkbox"
+                    checked={sampleDraft.abilityEnabled}
+                    disabled={selectedAttackerAbilities.length === 0}
+                    onChange={(event) => setSampleDraft((current) => ({ ...current, abilityEnabled: event.target.checked }))}
+                  />
+                  <span>
+                    <strong>방어 특성 적용</strong>
+                    <small>{sampleDraft.abilityEnabled && sampleDraft.ability ? displayNameForAbility(sampleDraft.ability) : 'OFF'}</small>
+                  </span>
+                </label>
+                <label className="field-label">
+                  <span>방어 특성</span>
+                  <select
+                    value={sampleDraft.ability}
+                    disabled={selectedAttackerAbilities.length === 0}
+                    onChange={(event) => setSampleDraft((current) => ({ ...current, ability: event.target.value }))}
+                  >
+                    {selectedAttackerAbilities.length === 0 ? <option value="">선택 가능 특성 없음</option> : null}
+                    {selectedAttackerAbilities.map((ability) => (
+                      <option key={ability} value={ability}>{displayNameForAbility(ability)}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <label className="field-label">
+                <span>지닌 도구</span>
+                <select
+                  value={sampleDraft.item}
+                  disabled={sampleDraft.item === MEGA_STONE_ITEM_ID}
+                  onChange={(event) => setSampleDraft((current) => ({ ...current, item: event.target.value }))}
+                >
+                  {BATTLE_ITEM_OPTIONS
+                    .filter((item) => item.id !== MEGA_STONE_ITEM_ID || sampleDraft.item === MEGA_STONE_ITEM_ID)
+                    .map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+                </select>
+              </label>
+
               <MovePicker
                 label="받을 기술"
                 value={defense.move}
@@ -1531,21 +2132,6 @@ function App() {
                   </small>
                 </div>
               ) : null}
-
-              <label className="ability-toggle condition-toggle">
-                <input
-                  type="checkbox"
-                  checked={defense.defenderHasHeldItem}
-                  onChange={(event) => setDefense((current) => ({
-                    ...current,
-                    defenderHasHeldItem: event.target.checked,
-                  }))}
-                />
-                <span>
-                  <strong>피격 포켓몬 도구 보유</strong>
-                  <small>{defense.defenderHasHeldItem ? 'ON' : 'OFF'}</small>
-                </span>
-              </label>
 
               <NatureModifierPicker
                 label="피격 성격"
@@ -1824,10 +2410,13 @@ function App() {
               <label className="field-label">
                 <span>스피드 도구/효과</span>
                 <select
-                  value={speed.item}
-                  onChange={(event) => setSpeed((current) => ({ ...current, item: event.target.value }))}
+                  value={sampleDraft.item}
+                  disabled={sampleDraft.item === MEGA_STONE_ITEM_ID}
+                  onChange={(event) => setSampleDraft((current) => ({ ...current, item: event.target.value }))}
                 >
-                  {SPEED_ITEM_OPTIONS.map((item) => (
+                  {BATTLE_ITEM_OPTIONS
+                    .filter((item) => item.id !== MEGA_STONE_ITEM_ID || sampleDraft.item === MEGA_STONE_ITEM_ID)
+                    .map((item) => (
                     <option key={item.id} value={item.id}>{item.label}</option>
                   ))}
                 </select>
@@ -1860,7 +2449,7 @@ function App() {
               </div>
 
               <div className="multiplier-summary">
-                <span>도구 {formatMultiplier(selectedSpeedItem.multiplier)}</span>
+                <span>도구 {formatMultiplier(selectedSpeedItem.speedMultiplier)}</span>
                 <span>직접 {formatMultiplier(speed.directMultiplier)}</span>
                 <strong>최종 {formatMultiplier(finalSpeedMultiplier)}</strong>
                 <small>{selectedSpeedItem.label}</small>
@@ -2063,6 +2652,26 @@ function App() {
           </section>
         </section>
       )}
+
+      {pendingSampleAction ? (
+        <div className="modal-backdrop" role="presentation">
+          <section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="unsaved-dialog-title">
+            <div>
+              <p className="eyebrow">Unsaved Changes</p>
+              <h2 id="unsaved-dialog-title">변경 사항을 저장할까요?</h2>
+              <p>현재 샘플의 저장되지 않은 변경이 있습니다. 계속하기 전에 처리 방법을 선택하세요.</p>
+            </div>
+            <div className="confirm-dialog__actions">
+              <button type="button" className="primary-button" onClick={saveAndContinuePendingAction}>
+                <Save size={17} aria-hidden="true" />
+                저장 후 계속
+              </button>
+              <button type="button" onClick={discardAndContinuePendingAction}>변경 취소</button>
+              <button type="button" onClick={() => setPendingSampleAction(null)}>돌아가기</button>
+            </div>
+          </section>
+        </div>
+      ) : null}
 
     </main>
   );

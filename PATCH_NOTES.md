@@ -17,7 +17,9 @@
 
 ### 배포
 
-- 배포 예정
+- 커밋: `eb5cfa2 Clarify base speed value label`
+- GitHub Pages 배포 성공 확인
+- 배포 주소: https://jin7369.github.io/pokemon-calculator/
 
 ## 2026-07-14
 

@@ -2016,8 +2016,8 @@ function App() {
                                 {result.types.map((type) => <TypeBadge key={type} type={type} />)}
                               </div>
                             </td>
-                            <td>{result.selfFinalSpeed}<small className="stat-detail">원본 {result.selfBaseSpeed}</small></td>
-                            <td>{result.targetFinalSpeed}<small className="stat-detail">원본 {result.targetBaseSpeed}</small></td>
+                            <td>{result.selfFinalSpeed}<small className="stat-detail">기본 실수치 {result.selfBaseSpeed}</small></td>
+                            <td>{result.targetFinalSpeed}<small className="stat-detail">기본 실수치 {result.targetBaseSpeed}</small></td>
                             <td>{formatSpeedMargin(result.margin)}</td>
                             <td>
                               <span className={`verdict verdict--${result.category}`}>
